@@ -3,3 +3,4 @@ PyExifTool==0.4.11
 Flask==2.0.1
 python-dateutil==2.8.2
 Pillow==8.3.2 
+gunicorn
