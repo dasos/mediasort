@@ -24,10 +24,25 @@
 		  <div class="card h-100">
 			<a href="thumbnail/1200/{{ set_id }}/{{ i }}.jpg" target="_blank"><img src="thumbnail/{{ set_id }}/{{ i }}.jpg" loading="lazy" class="card-img-top" /></a>
 			<!--<a class="remove-from-set" data-set="{{ set_id }}" data-item="{{ i }}" href="javascript:undefined"><i class="fas fa-unlink"></i></a>-->
-			<form action="/remove/{{ set.id }}/{{ i }}" method="post" class="form-inline">
-				<button type="submit"><i class="fas fa-unlink"></i>Remove from set</button>
-			</form>
-			<div class="card-body"><p class="card-text"><small class="text-muted">{{item.orig_filename}}</small></p></div>
+			<div class="card-body">
+			<table class="table table-condensed table-striped table-auto">
+				<tbody>
+					<tr>
+						<th>Filename</th>
+						<td class="text-right no-overflow-ellipse">{{item.orig_filename}}</td>
+					</tr>
+					<tr>
+						<th>Date/time</th>
+						<td class="text-right no-overflow-ellipse">{{item.timestamp}}</td>
+					</tr>
+				</tbody>
+			</table>
+			<div class="float-right">
+				<form action="/remove/{{ set.id }}/{{ i }}" method="post" class="form-inline">
+				<button type="submit" class="btn btn-link"><i class="fas fa-unlink"></i> Remove from set</button>
+				</form>
+	    	</div>							
+			</div>
 		  </div>
 	  </div>
 	{% endfor %}
