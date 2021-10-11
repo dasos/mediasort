@@ -20,7 +20,9 @@ class MediaItem:
        return
    
      self.path = path
-     self.dest_filename = os.path.basename(path)
+     self.orig_filename = os.path.basename(path)
+     self.dest_filename = self.orig_filename
+     # Note that we are not renaming the file, unless there are collisions. I'm not sure why
      self.dest_counter = None
      #self.hash = self.__hash(path)
      self.timestamp = self.__timestamp(path)
