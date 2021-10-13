@@ -18,7 +18,7 @@ def create_app():
 
 def load_config():
 
-  config = { "input_dir": "/input", "output_dir": "/output", "delete_dir": "/delete", "thumbnails": 21, "suggestions": ["arthur", "henry"] }
+  config = { "input_dir": "/input", "output_dir": "/output", "delete_dir": "/delete", "thumbnails": 6, "suggestions": ["arthur", "henry"] }
   try:
     with open("config.json") as json_file:
       loaded = json.load(json_file)
@@ -40,9 +40,6 @@ def load_all_sets():
     # Get all the sets as a list
     with dataLock:
       mediasort.load(config["input_dir"], all_sets)
-    
-      # Flip into a dict
-      #all_sets = {id(x): x for x in set_list}
    
   setThread = threading.Thread(target=load_data)
   setThread.start()
@@ -53,28 +50,39 @@ config = load_config()
 all_sets = []
 load_all_sets()
 
+#
+# Generates the basic HTML page
+#
+
 @app.route('/')
 def index():
   if (all_sets is not None):
-    return render_template('index.html', sets=all_sets[:5], thumbnails=config.get('thumbnails'))
+    return render_template('index.html', sets=all_sets[:5], num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
   return render_template('nothing.html')
+  
+#
+# Generates the thumbnails
+#
 
-@app.route('/thumbnail/<int:set_index>/<int:photo_id>.jpg')
-@app.route('/thumbnail/<int:size>/<int:set_index>/<int:photo_id>.jpg')
-def get_thumbnail(set_index, photo_id, size=300):
-  #set = get_set(set_index, request.form.get('id'))
-  set = all_sets[set_index]
-  item = set.set[photo_id]
+@app.route('/thumbnail/<int:set_id>/<int:photo_id>.jpg')
+@app.route('/thumbnail/<int:size>/<int:set_id>/<int:photo_id>.jpg')
+def get_thumbnail(set_id, photo_id, size=300):
+  item = get_item(set_id, photo_id)
+  
+  #item = set.set[photo_id]
   thumbnail = make_thumbnail(item.path, size)
 
   response = make_response(thumbnail)
   response.content_type = 'image/jpeg'
   return response
 
-def get_set(set_id, set_index=False):
+#
+# Searches through the array to find the right set. Note the array may change size, and alter dynamically
+# TODO: another approach?...
+#
+
+def get_set(set_id):
   global all_sets
-  if (set_index is not False and id(all_sets[set_index]) == set_id):
-    return all_sets[set_index]
   
   for s in all_sets:
     if (id(s) == set_id):
@@ -82,23 +90,55 @@ def get_set(set_id, set_index=False):
   
   raise Exception("Missing set.  set_id: {}".format(set_id))
 
+
+def get_item(set, item_id):
+  if isinstance(set, mediasort.MediaSet):
+    return [x for x in set.set if x.id == item_id][0]
+  
+  return get_item(get_set(set), item_id)
+
+#
+# Removes an item from a set.
+#
+
 @app.route('/remove/<int:set_id>/<int:photo_id>', methods=('POST',))
 def delete_from_set(set_id, photo_id):
   global all_sets
+  
   set = get_set(set_id)
   
-  item = set.set[photo_id]
+  item = get_item(set_id, photo_id)
   set.remove_item(item)
   
-  all_sets.append(mediasort.MediaSet(item))
-  all_sets.sort()
+  with dataLock:
+    all_sets.append(mediasort.MediaSet(item))
+    all_sets.sort()
   
   flash('Removed {}'.format(item.dest_filename))
   return redirect(url_for('index'))
 
+#
+# Gets more thumbnails for a set
+#
+@app.route('/set/<int:set_id>')
+def more_thumbnails(set_id):
+  set = get_set(set_id)
+  if (not set):
+    return 'Could not find set.', 400
+  start = request.args.get('start', default = 0, type = int)
+  end = request.args.get('end', default = 6, type = int)
+  
+  return render_template('thumbnails.html', set=set, start=start, end=end, base_path=config.get("input_dir"))
+
+#
+# Actions a set, by moving all the items in it.
+#
+
 #@app.route('/', methods=('POST',))
 @app.route('/set/<int:set_id>', methods=('POST',))
 def post(set_id):
+  global all_sets
+  
   set = get_set(set_id)
   if (not set):
     flash('Could not find set. Reloading the page', 'warning')
@@ -115,13 +155,15 @@ def post(set_id):
       dir = mediasort.move_all_in_set(set, config['output_dir']) 
     else:
       dir = mediasort.move_all_in_set(set, config['output_dir'], use_date_directory=False)
-    all_sets.remove(set)
+    with dataLock:
+      all_sets.remove(set)
     flash('Saved in {}'.format(dir))
     
   # Delete
   elif request.form.get("action") == "delete":
     dir = mediasort.move_all_in_set(set, config['delete_dir'], use_date_directory=False, use_name_directory=False)
-    all_sets.remove(set)
+    with dataLock:
+      all_sets.remove(set)
     flash('Saved in {}'.format(dir))
     
   else:
@@ -131,8 +173,7 @@ def post(set_id):
 @app.route('/names.json')
 def names():
   return json.dumps(['Arthur', 'Henry', 'Cats']);
-  
-  
+
 def make_thumbnail(filename, wh=300):
   from PIL import UnidentifiedImageError
   try:

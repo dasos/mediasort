@@ -21,11 +21,13 @@ class MediaItem:
    
      self.path = path
      self.orig_filename = os.path.basename(path)
+     self.orig_directory = os.path.dirname(path)
      self.dest_filename = self.orig_filename
      # Note that we are not renaming the file, unless there are collisions. I'm not sure why
      self.dest_counter = None
      #self.hash = self.__hash(path)
      self.timestamp = self.__timestamp(path)
+     self.id = id(self)
      
      if all_sets is not False:
        self.__set_set(all_sets);
@@ -40,13 +42,13 @@ class MediaItem:
      
      if not done:
        all_sets.append(MediaSet(self))
-       print ("Made new set: {}".format(len(all_sets)))   
+       print ("Made new set: {}".format(len(all_sets)))
      
      all_sets.sort()
 
    def __repr__(self):
      #return "<MediaItem {} {} {}>".format(self.path, self.hash, self.timestamp)
-     return "<MediaItem {} {}>".format(self.path, self.timestamp)
+     return "<MediaItem path:{} timestamp:{} id:{}>".format(self.path, self.timestamp, id(self))
 
 
    def find_alternate_filename(self):
@@ -158,9 +160,6 @@ class MediaSet:
     def sample_filenames(self, number=3):
       return [p.path for p in random.sample(self.set, min(len(self.set), number))]
     
-    def sample_index(self, number=3):
-      return random.sample(range(len(self.set)), min(len(self.set), number))
-    
     def date_directory(self):
       return self.start.strftime("%Y/%Y-%b/%Y-%m-%d").strip()
       
@@ -170,7 +169,7 @@ class MediaSet:
       return "<MediaSet: {} {} >".format(self.name, ''.join(str(i) for i in self.set))
     
     def __str__(self):
-      return "{} in set. Sample filenames: ".format(len(self.set)) + '; '.join(self.sample_set())
+      return "{} in set. Sample filenames: ".format(len(self.set)) + '; '.join(self.sample_filenames())
 
 
 def get_media(path):
