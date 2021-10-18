@@ -1,0 +1,14 @@
+version: '3.2'
+
+services:
+
+  app:
+    image: photosort
+    ports:
+     - 8080:8080
+    volumes:
+     - /data/archive/photosort/input:/input
+     - /data/archive/output:/output
+     - /data/archive/photosort/delete:/delete
+    environment:
+     - SECRET_KEY='badSecretKey'
