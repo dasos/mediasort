@@ -1,20 +1,28 @@
 import mediasort
 import base64, json
 import itertools
-import threading
-
+import os
 #ImageFile.LOAD_TRUNCATED_IMAGES = True
-
 from io import BytesIO
+from flask import Flask, render_template, request, flash, redirect, url_for, make_response, session, jsonify
+from flask_session import Session
+from flask_executor import Executor
 
-from flask import Flask, render_template, request, flash, redirect, url_for, make_response
+#
+# Set up Flask
+#
 
-dataLock = threading.Lock()
+app = Flask(__name__)
+if os.environ.get("SECRET_KEY") is not None:
+  app.secret_key = os.environ.get("SECRET_KEY")
+else:
+  app.secret_key = os.urandom(16)
 
-def create_app():
-  app = Flask(__name__)
-  app.config['SECRET_KEY'] = 'Zru78eP4YpSbzrQH6sQ57XfQhXFbqGHCdWmX4YkyRT4v9QpK'
-  return app
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)  
+
+app.config['EXECUTOR_PROPAGATE_EXCEPTIONS'] = True 
+executor = Executor(app)
 
 def load_config():
 
@@ -30,25 +38,38 @@ def load_config():
     
   return config
 
-def load_all_sets():
-  global all_sets
-  global setThread
-  
-  def load_data():
-    global all_sets
-    
-    # Get all the sets as a list
-    with dataLock:
-      mediasort.load(config["input_dir"], all_sets)
-   
-  setThread = threading.Thread(target=load_data)
-  setThread.start()
 
-
-app = create_app()
-config = load_config()
 all_sets = []
-load_all_sets()
+
+def load_sets(force = False):
+  global all_sets
+
+  def load_data(input_dir):
+    # Get all the sets as a list
+    mediasort.load(config["input_dir"], all_sets) # note the global variable
+    return all_sets
+  
+  #if 'load' not in executor.futures._futures
+  
+  if 'sets' not in session or force is True:
+    session['sets'] = all_sets = [] # shall I move this?
+    future = executor.submit_stored('load', load_data, config["input_dir"])
+    session['status'] = "in_progress"
+    
+  elif executor.futures.running('load'):
+    # This allows us to see the progress of the load
+    session['sets'] = all_sets
+    session['status'] = "in_progress"
+    
+  elif executor.futures.done('load'):
+    future = executor.futures.pop('load')
+    #session['sets'] = future.result()
+    session['sets'] = all_sets
+    session['status'] = "done"
+
+  
+
+config = load_config()
 
 #
 # Generates the basic HTML page
@@ -56,9 +77,20 @@ load_all_sets()
 
 @app.route('/')
 def index():
-  if (all_sets is not None):
-    return render_template('index.html', sets=all_sets[:5], num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
+
+  #if 'sets' not in session or len(session['sets']) == 0:
+  load_sets()
+  
+  #future = executor.futures.pop('load')
+  if session['sets'] is not None:
+    return render_template('index.html', sets=session['sets'][:5], num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
+    
   return render_template('nothing.html')
+
+@app.route('/status')
+def get_result():
+  load_sets()
+  return jsonify({'status': session['status']})
   
 #
 # Generates the thumbnails
@@ -82,13 +114,13 @@ def get_thumbnail(set_id, photo_id, size=300):
 #
 
 def get_set(set_id):
-  global all_sets
+  load_sets()
   
-  for s in all_sets:
-    if (id(s) == set_id):
+  for s in session['sets']:
+    if (s.id == set_id):
       return s
   
-  raise Exception("Missing set.  set_id: {}".format(set_id))
+  raise Exception("Missing set. set_id: {}".format(set_id))
 
 
 def get_item(set, item_id):
@@ -103,16 +135,19 @@ def get_item(set, item_id):
 
 @app.route('/remove/<int:set_id>/<int:photo_id>', methods=('POST',))
 def delete_from_set(set_id, photo_id):
-  global all_sets
   
+  if session['status'] == "in_progress":
+    flash('Data is still loading', 'warning')
+    return redirect(url_for('index'))
+    
+  load_sets()
   set = get_set(set_id)
   
   item = get_item(set_id, photo_id)
   set.remove_item(item)
   
-  with dataLock:
-    all_sets.append(mediasort.MediaSet(item))
-    all_sets.sort()
+  session['sets'].append(mediasort.MediaSet(item))
+  session['sets'].sort()
   
   flash('Removed {}'.format(item.dest_filename))
   return redirect(url_for('index'))
@@ -137,8 +172,12 @@ def more_thumbnails(set_id):
 #@app.route('/', methods=('POST',))
 @app.route('/set/<int:set_id>', methods=('POST',))
 def post(set_id):
-  global all_sets
-  
+
+  if session['status'] is "in_progress":
+    flash('Data is still loading', 'warning')
+    return redirect(url_for('index'))
+
+
   set = get_set(set_id)
   if (not set):
     flash('Could not find set. Reloading the page', 'warning')
@@ -155,15 +194,15 @@ def post(set_id):
       dir = mediasort.move_all_in_set(set, config['output_dir']) 
     else:
       dir = mediasort.move_all_in_set(set, config['output_dir'], use_date_directory=False)
-    with dataLock:
-      all_sets.remove(set)
+    
+    session['sets'].remove(set)
     flash('Saved in {}'.format(dir))
     
   # Delete
   elif request.form.get("action") == "delete":
     dir = mediasort.move_all_in_set(set, config['delete_dir'], use_date_directory=False, use_name_directory=False)
-    with dataLock:
-      all_sets.remove(set)
+    
+    session['sets'].remove(set)
     flash('Saved in {}'.format(dir))
     
   else:

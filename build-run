@@ -1,1 +1,1 @@
-docker build -t photosort . && docker run -it --rm -p 8080:8080/tcp -v /data/archive/photosort/input:/input -v /data/archive/output:/output -v /data/archive/photosort/delete:/delete photosort
+docker build -t photosort . && docker run -it --rm -p 8080:8080/tcp -v /data/archive/photosort/input:/input -v /data/archive/output:/output -v /data/archive/photosort/delete:/delete -e SECRET_KEY='badSecretKey' photosort

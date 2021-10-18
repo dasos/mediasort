@@ -1,7 +1,18 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>{% block title %} MediaSort {% endblock %}</h1>
+<div class="container mt-2">
+	<div class="row">
+		<div class="col-8">
+			<h1>{% block title %} MediaSort {% endblock %}</h1>
+		</div>
+		<div class="col-4 text-right">
+			<div class="spinner-border" id="status" role="status" style="display: none">
+				<span class="sr-only">Loading...</span>
+			</div>
+		</div>
+	</div>
+</div>
 
 {% for set in sets %}
 <div class="card bg-light pb-2">
@@ -86,6 +97,27 @@ $(document).on('click', '.more-thumbnails', function(e) {
     }
 	});
 });
+
+
+$(function() {
+  var statusCheck = function() {
+    console.log('Sending AJAX request...');
+    $.ajax({
+      url: "/status"
+    }).then(function(data) {
+      console.log(data.status)
+      if (data.status == "in_progress") {
+      	$('#status').show()
+        setTimeout(statusCheck, 5 * 1000);
+      } else {
+      	$('#status').hide()
+      }
+    });
+  }
+  
+  statusCheck();
+});
+
 
 
 <!-- The typeahead stuff -->
