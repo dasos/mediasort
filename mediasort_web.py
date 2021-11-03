@@ -1,12 +1,12 @@
 import mediasort
 import base64, json
 import itertools
-import os
+import os, pickle
 #ImageFile.LOAD_TRUNCATED_IMAGES = True
 from io import BytesIO
 from flask import Flask, render_template, request, flash, redirect, url_for, make_response, session, jsonify
-from flask_session import Session
 from flask_executor import Executor
+from flask_redis import FlaskRedis
 
 #
 # Set up Flask
@@ -18,8 +18,26 @@ if os.environ.get("SECRET_KEY") is not None:
 else:
   app.secret_key = os.urandom(16)
 
-app.config['SESSION_TYPE'] = 'filesystem'
-Session(app)  
+#app.config['SESSION_TYPE'] = 'filesystem'
+#Session(app)  
+
+app.config['REDIS_URL'] = "redis://redis:6379/0"
+redis_client = FlaskRedis(app, decode_responses=True)
+redis_client_pickled = FlaskRedis(app, decode_responses=False)
+
+
+######### CHANGE THIS! #########
+
+
+print ("*************************** FLUSHING DB! ***************************")
+redis_client.flushdb()
+
+
+
+
+
+
+
 
 app.config['EXECUTOR_PROPAGATE_EXCEPTIONS'] = True 
 executor = Executor(app)
@@ -38,38 +56,66 @@ def load_config():
     
   return config
 
+config = load_config()
 
-all_sets = []
 
-def load_sets(force = False):
-  global all_sets
+
+
+
+
+@app.before_first_request
+def populate_db(force = False):
 
   def load_data(input_dir):
     # Get all the sets as a list
-    mediasort.load(config["input_dir"], all_sets) # note the global variable
-    return all_sets
-  
-  #if 'load' not in executor.futures._futures
-  
-  if 'sets' not in session or force is True:
-    session['sets'] = all_sets = [] # shall I move this?
-    future = executor.submit_stored('load', load_data, config["input_dir"])
-    session['status'] = "in_progress"
-    
-  elif executor.futures.running('load'):
-    # This allows us to see the progress of the load
-    session['sets'] = all_sets
-    session['status'] = "in_progress"
-    
-  elif executor.futures.done('load'):
-    future = executor.futures.pop('load')
-    #session['sets'] = future.result()
-    session['sets'] = all_sets
+    def save_item(item, set):
+      redis_client.hset('set-{}'.format(set.id), 'start', set.start.timestamp())
+      redis_client.sadd('sets', set.id)
+      redis_client.set('item-{}-{}'.format(set.id, item.id), pickle.dumps(item))
+      #print ('INSERTING: item-{}-{}'.format(item.set.id, item.id))
+      
+    mediasort.load(config["input_dir"], save_item)
     session['status'] = "done"
 
   
+  # Not sure if I need this block 
+  session['status'] = "in_progress"
+  executor.submit_stored('load', load_data, config["input_dir"])
+  
+  return
 
-config = load_config()
+  
+#
+# Looks in Redis for items with a matching set_id. Then dynamically makes a new set, and puts the unpickled items in it
+#
+
+def get_set(set_id):
+  
+  set = None
+
+  for name in redis_client.scan_iter(match='item-{}-*'.format(set_id)):
+    item = pickle.loads(redis_client_pickled.get(name))
+    if set is None:
+      set = mediasort.MediaSet(item)
+      set.id = set_id
+    else:
+      set.add_item(item)
+  
+  if not set:
+    raise Exception("Missing set. set_id: {}".format(set_id))
+  
+  return set
+
+#
+# Unpickles a MediaItem from Redis
+#
+
+def get_item(set_id, item_id):
+  return pickle.loads(redis_client_pickled.get('item-{}-{}'.format(set_id, item_id)))
+
+
+def get_sets(limit = 5):
+  return [get_set(s) for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0)]
 
 #
 # Generates the basic HTML page
@@ -78,18 +124,21 @@ config = load_config()
 @app.route('/')
 def index():
 
-  #if 'sets' not in session or len(session['sets']) == 0:
-  load_sets()
-  
-  #future = executor.futures.pop('load')
-  if session['sets'] is not None:
-    return render_template('index.html', sets=session['sets'][:5], num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
-    
-  return render_template('nothing.html')
+  sets = get_sets()
+  return render_template('index.html', sets=sets, num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
+
 
 @app.route('/status')
 def get_result():
-  load_sets()
+
+  if status not in session:
+    session['status'] = "done"
+
+  if session['status'] == "in_progress" and executor.futures.done('load'):
+    print ("Load complete")
+    executor.futures.pop('load')
+    session['status'] = "done"
+
   return jsonify({'status': session['status']})
   
 #
@@ -108,26 +157,7 @@ def get_thumbnail(set_id, photo_id, size=300):
   response.content_type = 'image/jpeg'
   return response
 
-#
-# Searches through the array to find the right set. Note the array may change size, and alter dynamically
-# TODO: another approach?...
-#
 
-def get_set(set_id):
-  load_sets()
-  
-  for s in session['sets']:
-    if (s.id == set_id):
-      return s
-  
-  raise Exception("Missing set. set_id: {}".format(set_id))
-
-
-def get_item(set, item_id):
-  if isinstance(set, mediasort.MediaSet):
-    return [x for x in set.set if x.id == item_id][0]
-  
-  return get_item(get_set(set), item_id)
 
 #
 # Removes an item from a set.
@@ -136,18 +166,29 @@ def get_item(set, item_id):
 @app.route('/remove/<int:set_id>/<int:photo_id>', methods=('POST',))
 def delete_from_set(set_id, photo_id):
   
-  if session['status'] == "in_progress":
-    flash('Data is still loading', 'warning')
-    return redirect(url_for('index'))
-    
-  load_sets()
   set = get_set(set_id)
+  item = None
   
-  item = get_item(set_id, photo_id)
-  set.remove_item(item)
+  # Finding the item in the set "manually", rather than recreating it again from Redis
+  for i in set.set:
+    if i.id == photo_id:
+      item = i
+      set.remove_item(i)
+      break
   
-  session['sets'].append(mediasort.MediaSet(item))
-  session['sets'].sort()
+  new_set = mediasort.MediaSet(item)
+  
+  # Update existing set, in case start time has changed
+  redis_client.hset('set-{}'.format(set.id), 'start', set.start.timestamp())
+  
+  # Remove item
+  redis_client.delete('item-{}-{}'.format(set.id, item.id))
+  
+  # Add new set
+  redis_client.hset('set-{}'.format(new_set.id), 'start', new_set.start.timestamp())
+  redis_client.sadd('sets', new_set.id)
+  redis_client.set('item-{}-{}'.format(new_set.id, item.id), pickle.dumps(item))
+  
   
   flash('Removed {}'.format(item.dest_filename))
   return redirect(url_for('index'))
@@ -173,14 +214,18 @@ def more_thumbnails(set_id):
 @app.route('/set/<int:set_id>', methods=('POST',))
 def post(set_id):
 
-  if session['status'] is "in_progress":
-    flash('Data is still loading', 'warning')
-    return redirect(url_for('index'))
+
+  def del_redis_set(set):
+    redis_client.hdel('set-{}'.format(set.id))
+    redis_client.srem('sets', set.id)
+    for name in redis_client.scan_iter(match='item-{}-*'.format(set.id)):
+      redis_client.delete(name)
+    
 
 
   set = get_set(set_id)
   if (not set):
-    flash('Could not find set. Reloading the page', 'warning')
+    flash('Could not find set', 'warning')
     return redirect(url_for('index'))
   
   # With date
@@ -195,14 +240,14 @@ def post(set_id):
     else:
       dir = mediasort.move_all_in_set(set, config['output_dir'], use_date_directory=False)
     
-    session['sets'].remove(set)
+    del_redis_set(set)
     flash('Saved in {}'.format(dir))
     
   # Delete
   elif request.form.get("action") == "delete":
     dir = mediasort.move_all_in_set(set, config['delete_dir'], use_date_directory=False, use_name_directory=False)
     
-    session['sets'].remove(set)
+    del_redis_set(set)
     flash('Saved in {}'.format(dir))
     
   else:

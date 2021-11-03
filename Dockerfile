@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . ./
 
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8080
 
 ENTRYPOINT gunicorn mediasort_web:app --bind 0.0.0.0:8080 --log-level=debug --workers=1

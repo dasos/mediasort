@@ -28,23 +28,6 @@ class MediaItem:
      #self.hash = self.__hash(path)
      self.timestamp = self.__timestamp(path)
      self.id = id(self)
-     
-     if all_sets is not False:
-       self.__set_set(all_sets);
-     
-   def __set_set(self, all_sets):
-     done = False
-     
-     for s in all_sets:
-        done = s.add_item(self)
-        if done:
-          break
-     
-     if not done:
-       all_sets.append(MediaSet(self))
-       print ("Made new set: {}".format(len(all_sets)))
-     
-     all_sets.sort()
 
    def __repr__(self):
      #return "<MediaItem {} {} {}>".format(self.path, self.hash, self.timestamp)
@@ -282,30 +265,49 @@ def move_all_in_set(set, output_dir, use_date_directory=True, use_name_directory
     
     return folder_name
 
-def load(input_dir, all_sets = []):
+def load(input_dir, callback = None, all_sets = []):
 
     print ("Loading data. This may take some time.")
     # Get everything
-    all_items = [MediaItem(path, all_sets) for path in get_media(input_dir)]
     
-    print ("Done")
-    return
+    def upsert_set(item, all_sets):
     
-    all_items = sorted([MediaItem(path) for path in get_media(input_dir)])
-    
-    print ("\nNumber of items: {}".format(len(all_items)))
-    
-    # Then put them in sets
-    all_sets = []
-    set = None
-    for i in all_items:
-      if (set is None or not set.add_item(i)):
-        set = MediaSet(i)
+      found = False
+      set = None
+     
+      for s in all_sets:
+        found = s.add_item(item)
+        if found:
+          set = s
+          break
+     
+     
+      if not found:
+        set = MediaSet(item)
         all_sets.append(set)
-
-    print ("Done loading")
+        print ("Made new set: {}".format(len(all_sets)))
+     
+      # Sorting every time since the start of a set may have changed
+      all_sets.sort()
+      
+      return set
     
+    def create_sort_send(path):
+      # Create the MediaItem
+      item = MediaItem(path)
+      
+      # Put it in a set
+      set = upsert_set(item, all_sets)
+      
+      # Tell people we've done it
+      callback(item, set)
+    
+    all_items = [create_sort_send(path) for path in get_media(input_dir)]
+
+    
+    print ("Done. Number of sets: {}".format(len(all_sets)))
     return all_sets
+
 
 def main():
     args = parse_args()
