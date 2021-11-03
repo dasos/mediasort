@@ -26,17 +26,6 @@ redis_client = FlaskRedis(app, decode_responses=True)
 redis_client_pickled = FlaskRedis(app, decode_responses=False)
 
 
-######### CHANGE THIS! #########
-
-
-print ("*************************** FLUSHING DB! ***************************")
-redis_client.flushdb()
-
-
-
-
-
-
 
 
 app.config['EXECUTOR_PROPAGATE_EXCEPTIONS'] = True 
@@ -59,12 +48,7 @@ def load_config():
 config = load_config()
 
 
-
-
-
-
-@app.before_first_request
-def populate_db(force = False):
+def populate_db():
 
   def load_data(input_dir):
     # Get all the sets as a list
@@ -75,13 +59,10 @@ def populate_db(force = False):
       #print ('INSERTING: item-{}-{}'.format(item.set.id, item.id))
       
     mediasort.load(config["input_dir"], save_item)
-    session['status'] = "done"
 
   
-  # Not sure if I need this block 
-  session['status'] = "in_progress"
   executor.submit_stored('load', load_data, config["input_dir"])
-  
+  session['loaded'] = True
   return
 
   
@@ -123,23 +104,45 @@ def get_sets(limit = 5):
 
 @app.route('/')
 def index():
-
   sets = get_sets()
+  if not sets and not 'loaded' in session and not executor.futures.running('load'):
+    print ("Could not find any sets in Redis. Attempting to refresh")
+    populate_db()
+
   return render_template('index.html', sets=sets, num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
 
+
+@app.route('/reload')
+def reload_data():
+  if executor.futures.running('load'):
+    flash("Already loading", 'warning')
+    return redirect(url_for('index'))
+    
+  print ("*************************** FLUSHING DB! ***************************")
+  redis_client.flushdb()
+  populate_db()
+  flash("Refreshing sets from files")
+  return redirect(url_for('index'))
+  
 
 @app.route('/status')
 def get_result():
 
-  if status not in session:
-    session['status'] = "done"
+  data = {
+  	'item_count': len(list(redis_client.scan_iter(match='item-*'))),
+  	'set_count': len(list(redis_client.scan_iter(match='set-*')))
+  }
 
-  if session['status'] == "in_progress" and executor.futures.done('load'):
+  if executor.futures.running('load'):
+    data['status'] = 'in_progress'
+    return jsonify(data)
+
+  if executor.futures.done('load'):
     print ("Load complete")
     executor.futures.pop('load')
-    session['status'] = "done"
 
-  return jsonify({'status': session['status']})
+  data['status'] = 'done'
+  return jsonify(data)
   
 #
 # Generates the thumbnails
@@ -199,7 +202,7 @@ def delete_from_set(set_id, photo_id):
 @app.route('/set/<int:set_id>')
 def more_thumbnails(set_id):
   set = get_set(set_id)
-  if (not set):
+  if not set:
     return 'Could not find set.', 400
   start = request.args.get('start', default = 0, type = int)
   end = request.args.get('end', default = 6, type = int)
