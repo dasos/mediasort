@@ -21,7 +21,11 @@ else:
 #app.config['SESSION_TYPE'] = 'filesystem'
 #Session(app)  
 
-app.config['REDIS_URL'] = "redis://redis:6379/0"
+if os.environ.get("REDIS_URL") is not None:
+  app.config['REDIS_URL'] = os.environ.get("REDIS_URL")
+else:
+  app.config['REDIS_URL'] = "redis://redis:6379/0"
+
 redis_client = FlaskRedis(app, decode_responses=True)
 redis_client_pickled = FlaskRedis(app, decode_responses=False)
 
