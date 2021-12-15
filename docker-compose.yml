@@ -20,8 +20,8 @@ services:
      - /data/archive/output:/output
      - /data/archive/photosort/delete:/delete
     environment:
-     - SECRET_KEY='badSecretKey'
-     - REDIS_URL='redis://redis:6379/0'
+     - 'SECRET_KEY=badSecretKey'
+     - 'REDIS_URL=redis://redis:6379/0'
 
 networks:
  internal:

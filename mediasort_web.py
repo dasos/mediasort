@@ -4,6 +4,7 @@ import itertools
 import os, pickle
 #ImageFile.LOAD_TRUNCATED_IMAGES = True
 from io import BytesIO
+import requests
 from flask import Flask, render_template, request, flash, redirect, url_for, make_response, session, jsonify
 from flask_executor import Executor
 from flask_redis import FlaskRedis
@@ -164,8 +165,46 @@ def get_thumbnail(set_id, photo_id, size=300):
   response.content_type = 'image/jpeg'
   return response
 
+@app.route('/location/<int:set_id>/<int:photo_id>')
+def get_location(set_id, photo_id):
+  item = get_item(set_id, photo_id)
+  
+  if item.coords is None:
+    return ""
+  
+  rounded_coords = round(item.coords[0], 5), round(item.coords[1], 5)
+  rounded_coords_key = 'coord-{}-{}'.format(rounded_coords[0], rounded_coords[1])
+  
+  if redis_client.exists(rounded_coords_key):
+    return redis_client.get(rounded_coords_key)
+  
+  result = request_location(rounded_coords)
+  
+  redis_client.set(rounded_coords_key, result)
+  
+  return result
+  
+def request_location(coords):
+  payload = {'lat': coords[0], 'lon': coords[1]}
 
-
+  r = requests.get('https://photon.komoot.io/reverse', params=payload)
+  
+  if "features" not in r.json() or len(r.json()["features"]) != 1:
+    print (r.text)
+    return ""
+    
+  result = r.json()["features"][0]["properties"]
+  
+  print (result)
+  
+  if "city" in result:
+    return result["city"]
+    
+  if "name" in result:
+    return result["name"]
+    
+  return result
+    
 #
 # Removes an item from a set.
 #

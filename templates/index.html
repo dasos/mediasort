@@ -98,10 +98,26 @@ $(document).on('click', '.more-thumbnails', function(e) {
        url: '/set/' + $(this).data('set_id') + '?' + jQuery.param({start: start + difference, end: end + difference}),
        success: function(result) {
          target.replaceWith(result);
+		 resolveCoords()
     }
 	});
 });
 
+function resolveCoords() {
+	$('.coords').each(function() {
+
+		var target = $(this)
+	  
+		$.ajax({
+		   url: '/location/' + $(this).data('set_id') + '/' + $(this).data('item_id'),
+		   success: function(result) {
+			 target.html(result);
+			 target.removeClass("coords");
+		}
+		});
+	  });
+};
+resolveCoords();
 
 $(function() {
   var statusCheck = function() {

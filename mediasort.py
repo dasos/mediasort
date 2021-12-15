@@ -3,7 +3,7 @@ import argparse, sys, os, hashlib, datetime, itertools, shutil, re, random
 VERSION = "0.0.1"
 
 
-class NoTimestamp(Exception):
+class NoTag(Exception):
   pass
 
 
@@ -26,7 +26,9 @@ class MediaItem:
      # Note that we are not renaming the file, unless there are collisions. I'm not sure why
      self.dest_counter = None
      #self.hash = self.__hash(path)
-     self.timestamp = self.__timestamp(path)
+     self.exif = self.__get_exif()
+     self.timestamp = self.__timestamp()
+     self.coords = self.__coords()
      self.id = id(self)
 
    def __repr__(self):
@@ -53,44 +55,85 @@ class MediaItem:
      return hash_func.hexdigest()
 
 
-   def __timestamp(self, filename):
-     return datetime.datetime.strptime(self.__read_timestamp(filename), '%Y:%m:%d %H:%M:%S')
+   def __timestamp(self):
+     return datetime.datetime.strptime(self.__read_timestamp(), '%Y:%m:%d %H:%M:%S')
    
-   def __read_timestamp(self, filename):
-     try:
-       result = self.__exifread(filename)
-     except NoTimestamp:
-       result = self.__exiftool(filename)
-     return result
+   def __coords(self):
+     lat_long = self.__get_tag(['Composite GPSPosition'])
+     if lat_long is not None:
+       return tuple(lat_long.split(' ', 1))
+     
+     import exifread
+     return exifread.utils.get_gps_coords(self.exif)
+   
+   def __read_timestamp(self):
+     tag = self.__get_tag(['EXIF DateTimeOriginal', 'EXIF DateTimeDigitized', 'Image DateTime', 'QuickTime MediaCreateDate'])
+     if tag is None:
+       raise NoTag
+     return str(tag)
+     
+   def __get_tag(self, tags):
+     
+     for t in tags:
+       if t in self.exif:
+         return self.exif[t]
+     
+     return None
+
+   def __get_exif(self):
+   
+     exif = self.__exifread(self.path)
+     
+     if not exif:
+       exif = self.__exiftool(self.path)
+   
+     if not exif:
+       raise NoTag
+     
+     return exif
+   
    
    def __exifread(self, filename):
      import exifread
      
      with open(filename, 'rb') as f:
-       tags = exifread.process_file(f, details=False)
+       data = exifread.process_file(f, details=False)
 
-     if 'EXIF DateTimeOriginal' in tags:
-       return str(tags['EXIF DateTimeOriginal'])
-     elif 'EXIF DateTimeDigitized' in tags:
-       return str(tags['EXIF DateTimeDigitized'])
-     elif 'Image DateTime' in tags:
-       return str(tags['Image DateTime'])
+     return data
      
-     raise NoTimestamp
-   
    def __exiftool(self, filename):
      import exiftool
+     
      with exiftool.ExifTool() as e:
-       metadata = e.get_metadata(filename)
-       if 'EXIF:DateTimeOriginal' in metadata:
-         return str(metadata['EXIF:DateTimeOriginal'])
-       elif 'EXIF:DateTimeDigitized' in metadata:
-         return str(metadata['EXIF:DateTimeDigitized'])
-       elif 'QuickTime:CreateDate' in metadata:
-         return str(metadata['QuickTime:CreateDate'])
-       else:
-         print (metadata)
-         raise MissingTimestampError
+       data = e.get_metadata(filename)
+     
+     # Turn EXIF:DateTimeOriginal into EXIF DateTimeOriginal
+     return {k.replace(":", " "):v for (k,v) in data.items()}
+     
+
+   # def __exifread(self, filename, tags=['EXIF DateTimeOriginal', 'EXIF DateTimeDigitized', 'Image DateTime']):
+     # import exifread
+     
+     # with open(filename, 'rb') as f:
+       # data = exifread.process_file(f, details=False)
+
+     # for t in tags:
+       # if t in data:
+         # return str(data[t])
+     
+     # raise NoTag
+   
+   # def __exiftool(self, filename, tags=['EXIF:DateTimeOriginal', 'EXIF:DateTimeDigitized', 'QuickTime:CreateDate']):
+     # import exiftool
+     # with exiftool.ExifTool() as e:
+       # data = e.get_metadata(filename)
+
+     # for t in tags:
+       # if t in data:
+         # return str(data[t])
+
+     # print (dat)
+     # raise NoTag
 
 
 class MediaSet:
