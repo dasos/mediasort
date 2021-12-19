@@ -11,6 +11,8 @@ WORKDIR /usr/src/mediasort
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+# For Redis
+RUN mkdir /data
 
 COPY . ./
 
