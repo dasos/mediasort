@@ -80,6 +80,7 @@ def get_set(set_id):
   set = None
 
   for name in redis_client.scan_iter(match='item-{}-*'.format(set_id)):
+
     item = pickle.loads(redis_client_pickled.get(name))
     if set is None:
       set = mediasort.MediaSet(item)
@@ -172,7 +173,7 @@ def get_location(set_id, photo_id):
   if item.coords is None:
     return ""
   
-  rounded_coords = round(item.coords[0], 5), round(item.coords[1], 5)
+  rounded_coords = round(float(item.coords[0]), 5), round(float(item.coords[1]), 5)
   rounded_coords_key = 'coord-{}-{}'.format(rounded_coords[0], rounded_coords[1])
   
   if redis_client.exists(rounded_coords_key):
@@ -222,6 +223,10 @@ def delete_from_set(set_id, photo_id):
       set.remove_item(i)
       break
   
+  if item is None:
+    raise Exception("Could not find item in old set")
+  
+  
   new_set = mediasort.MediaSet(item)
   
   # Update existing set, in case start time has changed
@@ -229,11 +234,13 @@ def delete_from_set(set_id, photo_id):
   
   # Remove item
   redis_client.delete('item-{}-{}'.format(set.id, item.id))
+  print("Removing item from Redis: item-{}-{}".format(set.id, item.id))
   
   # Add new set
   redis_client.hset('set-{}'.format(new_set.id), 'start', new_set.start.timestamp())
   redis_client.sadd('sets', new_set.id)
   redis_client.set('item-{}-{}'.format(new_set.id, item.id), pickle.dumps(item))
+  print("Adding item to Redis: item-{}-{}".format(new_set.id, item.id))
   
   
   flash('Removed {}'.format(item.dest_filename))
@@ -262,7 +269,8 @@ def post(set_id):
 
 
   def del_redis_set(set):
-    redis_client.hdel('set-{}'.format(set.id))
+    #redis_client.hdel('set-{}'.format(set.id), 'start')
+    redis_client.delete('set-{}'.format(set.id))
     redis_client.srem('sets', set.id)
     for name in redis_client.scan_iter(match='item-{}-*'.format(set.id)):
       redis_client.delete(name)

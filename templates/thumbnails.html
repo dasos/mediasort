@@ -18,7 +18,12 @@
 				{% endif %}
 				<tr>
 					<th>Location</th>
-					<td class="text-right no-overflow-ellipse coords" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">{{ item.coords }}</td>
+					<td class="text-right no-overflow-ellipse coords" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
+						{% if item.coords %}
+						<a href="https://www.openstreetmap.org/?mlat={{ item.coords[0] }}&mlon={{ item.coords[1] }}#map=18/{{ item.coords[0] }}/{{ item.coords[1] }}" target="_BLANK"><span>{{ item.coords }}</span></a></td>
+						{% else %}
+						<span>{{ item.coords }}</span>
+						{% endif %}
 				</tr>
 				<tr>
 					<th>Date/time</th>

@@ -106,7 +106,7 @@ $(document).on('click', '.more-thumbnails', function(e) {
 function resolveCoords() {
 	$('.coords').each(function() {
 
-		var target = $(this)
+		var target = $(this).find("span");
 	  
 		$.ajax({
 		   url: '/location/' + $(this).data('set_id') + '/' + $(this).data('item_id'),

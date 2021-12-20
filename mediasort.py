@@ -27,8 +27,8 @@ class MediaItem:
      self.dest_counter = None
      #self.hash = self.__hash(path)
      self.exif = self.__get_exif()
-     self.timestamp = self.__timestamp()
-     self.coords = self.__coords()
+     self.timestamp = self.get_timestamp()
+     self.coords = self.get_coords()
      self.id = id(self)
 
    def __repr__(self):
@@ -53,12 +53,22 @@ class MediaItem:
        for chunk in iter(lambda: f.read(4096), b""):
          hash_func.update(chunk)
      return hash_func.hexdigest()
+     
+   def __getstate__(self):
+      state = self.__dict__.copy()
+      # Don't pickle exif
+      del state["exif"]
+      return state
 
+   def __setstate__(self, state):
+      self.__dict__.update(state)
+      # Adding exif back in
+      self.exif = self.__get_exif()
 
-   def __timestamp(self):
+   def get_timestamp(self):
      return datetime.datetime.strptime(self.__read_timestamp(), '%Y:%m:%d %H:%M:%S')
    
-   def __coords(self):
+   def get_coords(self):
      lat_long = self.__get_tag(['Composite GPSPosition'])
      if lat_long is not None:
        return tuple(lat_long.split(' ', 1))
