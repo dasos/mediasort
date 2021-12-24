@@ -81,7 +81,12 @@ def get_set(set_id):
 
   for name in redis_client.scan_iter(match='item-{}-*'.format(set_id)):
 
-    item = pickle.loads(redis_client_pickled.get(name))
+    try:
+      item = pickle.loads(redis_client_pickled.get(name))
+    except FileNotFoundError:
+      print ("File has gone away")
+      redis_client.delete(name)
+      
     if set is None:
       set = mediasort.MediaSet(item)
       set.id = set_id
@@ -90,6 +95,9 @@ def get_set(set_id):
   
   if not set:
     raise Exception("Missing set. set_id: {}".format(set_id))
+  
+  # Resetting the start time, in case it has changed
+  redis_client.hset('set-{}'.format(set_id), 'start', set.start.timestamp())
   
   return set
 

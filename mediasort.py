@@ -92,10 +92,15 @@ class MediaItem:
 
    def __get_exif(self):
    
-     exif = self.__exifread(self.path)
+     try:
+       exif = self.__exifread(self.path)
      
-     if not exif:
-       exif = self.__exiftool(self.path)
+       if not exif:
+         exif = self.__exiftool(self.path)
+
+     except FileNotFoundError:
+       print ("Could not open file: {}".format(item.path))
+       raise FileNotFoundError
    
      if not exif:
        raise NoTag
