@@ -99,7 +99,7 @@ class MediaItem:
          exif = self.__exiftool(self.path)
 
      except FileNotFoundError:
-       print ("Could not open file: {}".format(item.path))
+       print ("Could not open file: {}".format(self.path))
        raise FileNotFoundError
    
      if not exif:
