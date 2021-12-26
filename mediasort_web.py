@@ -86,6 +86,7 @@ def get_set(set_id):
     except FileNotFoundError:
       print ("File has gone away")
       redis_client.delete(name)
+      continue
       
     if set is None:
       set = mediasort.MediaSet(item)
