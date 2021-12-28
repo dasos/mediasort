@@ -95,7 +95,7 @@ def get_set(set_id):
       set.add_item(item)
   
   if not set:
-    raise Exception("Missing set. set_id: {}".format(set_id))
+    raise TypeError("Missing set. set_id: {}".format(set_id))
   
   # Resetting the start time, in case it has changed
   redis_client.hset('set-{}'.format(set_id), 'start', set.start.timestamp())
@@ -111,7 +111,17 @@ def get_item(set_id, item_id):
 
 
 def get_sets(limit = 5):
-  return [get_set(s) for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0)]
+  sets = []
+  for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0)
+    try:
+      sets.append(get_set(s))
+    except TypeError:
+      redis_client.delete('set-{}'.format(s))
+      redis_client.srem('sets', s)
+  
+  return sets
+  
+  #return [get_set(s) for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0)]
 
 #
 # Generates the basic HTML page
