@@ -2,7 +2,7 @@ exifread==2.3.2
 PyExifTool==0.4.11
 Flask==2.0.2
 python-dateutil==2.8.2
-Pillow==8.4.0 
+Pillow==9.0.0 
 gunicorn
 flask-redis
 flask-executor
