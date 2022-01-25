@@ -11,13 +11,14 @@ class MediaItem:
    '''Represents a photo or a video.'''
    
    def __init__(self, path, all_sets=False):
-     if path.endswith('.jpg'):
-       self.suffix = ".jpg"
-     elif path.endswith('.mp4'):
-       self.suffix = ".jpg"
-     else:
-       print ("Not a valid file")
-       return
+     # Gonna duck type it
+     # if path.lower().endswith('.jpg'):
+       # self.suffix = ".jpg"
+     # elif path.lower().endswith('.mp4'):
+       # self.suffix = ".jpg"
+     # else:
+       # print ("Not a valid file")
+       # raise ValueError
    
      self.path = path
      self.orig_filename = os.path.basename(path)
@@ -27,7 +28,10 @@ class MediaItem:
      self.dest_counter = None
      #self.hash = self.__hash(path)
      self.exif = self.__get_exif()
+     
+     # This will throw an exception if a timestamp cannot be extracted
      self.timestamp = self.get_timestamp()
+
      self.coords = self.get_coords()
      self.id = id(self)
 
@@ -79,7 +83,8 @@ class MediaItem:
    def __read_timestamp(self):
      tag = self.__get_tag(['EXIF DateTimeOriginal', 'EXIF DateTimeDigitized', 'Image DateTime', 'QuickTime MediaCreateDate'])
      if tag is None:
-       raise NoTag
+       print ("No tag in: {}".format(self.path))
+       raise ValueError
      return str(tag)
      
    def __get_tag(self, tags):
@@ -215,9 +220,8 @@ class MediaSet:
 
 def get_media(path):
     for dirpath, dirnames, files in os.walk(path):
-        for f in files:
-            if f.endswith('.jpg') or f.endswith('.mp4'):
-                yield os.path.join(dirpath, f)
+      for f in files:
+        yield os.path.join(dirpath, f)
 
       
 def pairwise(iterable):
@@ -352,7 +356,12 @@ def load(input_dir, callback = None, all_sets = []):
     
     def create_sort_send(path):
       # Create the MediaItem
-      item = MediaItem(path)
+      try:
+        item = MediaItem(path)
+      except ValueError:
+        return None
+      
+      # Ignore invalid files
       
       # Put it in a set
       set = upsert_set(item, all_sets)

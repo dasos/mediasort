@@ -8,17 +8,17 @@
 			<tbody>
 				<tr>
 					<th>Filename</th>
-					<td class="text-right no-overflow-ellipse">{{ item.orig_filename }}</td>
+					<td class="text-right text-truncate" style="max-width: 200px;">{{ item.orig_filename }}</td>
 				</tr>
 				{% if item.orig_directory is not equalto base_path %}
 				<tr>
 					<th>Directory</th>
-					<td class="text-right no-overflow-ellipse">{{ item.orig_directory | replace(base_path, "") }}</td>
+					<td class="text-right text-truncate" style="max-width: 200px;">{{ item.orig_directory | replace(base_path, "") }}</td>
 				</tr>
 				{% endif %}
 				<tr>
 					<th>Location</th>
-					<td class="text-right no-overflow-ellipse coords" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
+					<td class="text-right text-truncate coords" style="max-width: 200px;" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
 						{% if item.coords %}
 						<a href="https://www.openstreetmap.org/?mlat={{ item.coords[0] }}&mlon={{ item.coords[1] }}#map=18/{{ item.coords[0] }}/{{ item.coords[1] }}" target="_BLANK"><span>{{ item.coords }}</span></a></td>
 						{% else %}
@@ -27,7 +27,7 @@
 				</tr>
 				<tr>
 					<th>Date/time</th>
-					<td class="text-right no-overflow-ellipse">{{ item.timestamp }}</td>
+					<td class="text-right text-truncate" style="max-width: 200px;">{{ item.timestamp }}</td>
 				</tr>
 			</tbody>
 		</table>

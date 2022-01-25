@@ -1,1 +1,1 @@
-docker build -t photosort . && docker-compose up
+docker build -t photosort . && docker-compose -f noredis.docker-compose.yml up

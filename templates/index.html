@@ -55,7 +55,7 @@
 {% if sets|length == 0 %}
 <h2>There is nothing to sort</h2>
 
-<p>If you were expecting something, then check the configuration.</p>
+<p>Try hitting the refresh button, or check the configuration</p>
 {% endif %}
 
 <!-- Modal -->
@@ -127,7 +127,7 @@ $(function() {
     }).then(function(data) {
       console.log(data.status)
       $('#stats').show().html(`${data.set_count} Sets ${data.item_count} Items`)
-      if (data.status == "in_progress") {
+      if (data.status == "loading") {
       	$('#status').show()
       	$('#reload').hide()
         setTimeout(statusCheck, 5 * 1000);

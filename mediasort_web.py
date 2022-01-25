@@ -5,7 +5,7 @@ import os, pickle
 #ImageFile.LOAD_TRUNCATED_IMAGES = True
 from io import BytesIO
 import requests
-from flask import Flask, render_template, request, flash, redirect, url_for, make_response, session, jsonify
+from flask import Flask, render_template, request, flash, redirect, url_for, make_response, jsonify
 from flask_executor import Executor
 from flask_redis import FlaskRedis
 
@@ -27,7 +27,9 @@ if os.environ.get("REDIS_URL") is not None:
 else:
   app.config['REDIS_URL'] = "redis://redis:6379/0"
 
+# For most Redis requests
 redis_client = FlaskRedis(app, decode_responses=True)
+# For when we want the raw data, for when we pickle objects
 redis_client_pickled = FlaskRedis(app, decode_responses=False)
 
 
@@ -44,16 +46,26 @@ def load_config():
       loaded = json.load(json_file)
       config.update(loaded)
   except Exception:
-    print ("Could not load config.json file. Defaults will be used")
+    print ("No config.json file. Defaults will be used")
     
   print(config["input_dir"])
     
   return config
 
+
+def initial_load():
+  status = redis_client.get('status')
+  if status == "loading":
+    print ("Unclean shutdown. Resetting flag")
+    redis_client.set('status', '')
+
+
 config = load_config()
+initial_load()
 
 
-def populate_db():
+
+def populate_db(force=False):
 
   def load_data(input_dir):
     # Get all the sets as a list
@@ -64,13 +76,20 @@ def populate_db():
       #print ('INSERTING: item-{}-{}'.format(item.set.id, item.id))
       
     mediasort.load(config["input_dir"], save_item)
+    print ("Setting status as done.")
+    redis_client.set('status', 'done')
 
+  status = redis_client.get('status')
+  if status == "loading":
+    print ("Status is loading")
+    if force is False:
+      return False
   
-  executor.submit_stored('load', load_data, config["input_dir"])
-  session['loaded'] = True
+  print ("Starting new thread for load")
+  redis_client.set('status', 'loading')
+  executor.submit(load_data, config["input_dir"])
   return
 
-  
 #
 # Looks in Redis for items with a matching set_id. Then dynamically makes a new set, and puts the unpickled items in it
 #
@@ -112,7 +131,7 @@ def get_item(set_id, item_id):
 
 def get_sets(limit = 5):
   sets = []
-  for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0)
+  for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0):
     try:
       sets.append(get_set(s))
     except TypeError:
@@ -126,25 +145,40 @@ def get_sets(limit = 5):
 #
 # Generates the basic HTML page
 #
+  
 
 @app.route('/')
 def index():
   sets = get_sets()
-  if not sets and not 'loaded' in session and not executor.futures.running('load'):
-    print ("Could not find any sets in Redis. Attempting to refresh")
-    populate_db()
+  #if not sets:
+  #  print ("Could not find any sets in Redis. Attempting to refresh")
+  #  populate_db()
 
   return render_template('index.html', sets=sets, num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
 
 
 @app.route('/reload')
 def reload_data():
-  if executor.futures.running('load'):
+  
+  status = redis_client.get('status')
+  if status == "loading":
+    print ("Already loading");
     flash("Already loading", 'warning')
     return redirect(url_for('index'))
     
-  print ("*************************** FLUSHING DB! ***************************")
-  redis_client.flushdb()
+  print ("*************************** FLUSHING ITEMS! ***************************")
+  
+  
+  for name in redis_client.scan_iter(match='item-*'):
+    redis_client.delete(name)
+
+  for name in redis_client.scan_iter(match='set-*'):
+    redis_client.delete(name)  
+
+  redis_client.delete("sets")    
+  
+  
+  #redis_client.flushdb()
   populate_db()
   flash("Refreshing sets from files")
   return redirect(url_for('index'))
@@ -155,18 +189,10 @@ def get_result():
 
   data = {
   	'item_count': len(list(redis_client.scan_iter(match='item-*'))),
-  	'set_count': len(list(redis_client.scan_iter(match='set-*')))
+  	'set_count': len(list(redis_client.scan_iter(match='set-*'))),
+  	'status': redis_client.get('status')
   }
 
-  if executor.futures.running('load'):
-    data['status'] = 'in_progress'
-    return jsonify(data)
-
-  if executor.futures.done('load'):
-    print ("Load complete")
-    executor.futures.pop('load')
-
-  data['status'] = 'done'
   return jsonify(data)
   
 #
