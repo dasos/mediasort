@@ -19,8 +19,9 @@ if os.environ.get("SECRET_KEY") is not None:
 else:
   app.secret_key = os.urandom(16)
 
-#app.config['SESSION_TYPE'] = 'filesystem'
-#Session(app)  
+# Get url_for working behind SSL
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
 
 if os.environ.get("REDIS_URL") is not None:
   app.config['REDIS_URL'] = os.environ.get("REDIS_URL")
@@ -321,9 +322,9 @@ def post(set_id):
       redis_client.delete(name)
     
 
-
-  set = get_set(set_id)
-  if (not set):
+  try:
+    set = get_set(set_id)
+  except:
     flash('Could not find set', 'warning')
     return redirect(url_for('index'))
   
@@ -351,6 +352,7 @@ def post(set_id):
     
   else:
     flash("Nothing")
+
   return redirect(url_for('index'))
 
 @app.route('/names.json')
