@@ -1,4 +1,4 @@
-FROM jjanzic/docker-python3-opencv
+FROM python:3.9
 
 RUN apt-get update -qq \
     && apt-get -y --no-install-recommends install exiftool \

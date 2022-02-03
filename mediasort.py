@@ -43,10 +43,9 @@ class MediaItem:
    def find_alternate_filename(self):
      if self.dest_counter is None:
        self.dest_counter = 0
-       self.dest_filename = self.dest_filename[:-4] + '-0000' + self.suffix
      else:
        self.dest_counter += 1
-       self.dest_filename = "%s-%04d%s" % (self.dest_filename[:-9], self.dest_counter, self.suffix)
+     self.dest_filename = "%s-%04d%s" % (self.dest_filename[:-9], self.dest_counter, self.dest_filename[-4:])
    
    def __lt__(self, other):
      return self.timestamp < other.timestamp
