@@ -307,40 +307,6 @@ def more_thumbnails(set_id):
   return render_template('thumbnails.html', set=set, start=start, end=end, base_path=config.get("input_dir"))
 
 
-
-
-
-
-
-
-
-  def load_data(input_dir):
-    # Get all the sets as a list
-    def save_item(item, set):
-      redis_client.hset('set-{}'.format(set.id), 'start', set.start.timestamp())
-      redis_client.sadd('sets', set.id)
-      redis_client.set('item-{}-{}'.format(set.id, item.id), pickle.dumps(item))
-      #print ('INSERTING: item-{}-{}'.format(item.set.id, item.id))
-      
-    mediasort.load(config["input_dir"], save_item)
-    print ("Setting status as done.")
-    redis_client.set('status', 'done')
-
-  status = redis_client.get('status')
-  if status == "loading":
-    print ("Status is loading")
-    if force is False:
-      return False
-  
-
-
-
-
-
-
-
-
-
 #
 # Actions a set, by moving all the items in it.
 #
