@@ -136,6 +136,7 @@ def get_sets(limit = 5):
     try:
       sets.append(get_set(s))
     except TypeError:
+      print ("Cleaning up set: {}".format(s))
       redis_client.delete('set-{}'.format(s))
       redis_client.srem('sets', s)
   
@@ -189,9 +190,9 @@ def reload_data():
 def get_result():
 
   data = {
-  	'item_count': len(list(redis_client.scan_iter(match='item-*'))),
-  	'set_count': len(list(redis_client.scan_iter(match='set-*'))),
-  	'status': redis_client.get('status')
+    'item_count': len(list(redis_client.scan_iter(match='item-*'))),
+    'set_count': len(list(redis_client.scan_iter(match='set-*'))),
+    'status': redis_client.get('status')
   }
 
   return jsonify(data)
@@ -244,11 +245,11 @@ def request_location(coords):
   
   print (result)
   
-  if "city" in result:
-    return result["city"]
-    
   if "name" in result:
     return result["name"]
+  
+  if "city" in result:
+    return result["city"]
     
   return result
     
@@ -305,6 +306,41 @@ def more_thumbnails(set_id):
   
   return render_template('thumbnails.html', set=set, start=start, end=end, base_path=config.get("input_dir"))
 
+
+
+
+
+
+
+
+
+  def load_data(input_dir):
+    # Get all the sets as a list
+    def save_item(item, set):
+      redis_client.hset('set-{}'.format(set.id), 'start', set.start.timestamp())
+      redis_client.sadd('sets', set.id)
+      redis_client.set('item-{}-{}'.format(set.id, item.id), pickle.dumps(item))
+      #print ('INSERTING: item-{}-{}'.format(item.set.id, item.id))
+      
+    mediasort.load(config["input_dir"], save_item)
+    print ("Setting status as done.")
+    redis_client.set('status', 'done')
+
+  status = redis_client.get('status')
+  if status == "loading":
+    print ("Status is loading")
+    if force is False:
+      return False
+  
+
+
+
+
+
+
+
+
+
 #
 # Actions a set, by moving all the items in it.
 #
@@ -313,46 +349,52 @@ def more_thumbnails(set_id):
 @app.route('/set/<int:set_id>', methods=('POST',))
 def post(set_id):
 
-
-  def del_redis_set(set):
-    #redis_client.hdel('set-{}'.format(set.id), 'start')
-    redis_client.delete('set-{}'.format(set.id))
-    redis_client.srem('sets', set.id)
-    for name in redis_client.scan_iter(match='item-{}-*'.format(set.id)):
-      redis_client.delete(name)
-    
-
   try:
     set = get_set(set_id)
   except:
     flash('Could not find set', 'warning')
     return redirect(url_for('index'))
-  
-  # With date
+    
   if request.form.get("action") == "save_date" or request.form.get("action") == "save_no_date":
     if not request.form.get('name'):
       flash('You must provide a name to save', 'warning')
       return redirect(url_for('index'))
-      
-    set.set_name(str(request.form.get('name')))
-    if request.form.get("action") == "save_date":
-      dir = mediasort.move_all_in_set(set, config['output_dir']) 
-    else:
-      dir = mediasort.move_all_in_set(set, config['output_dir'], use_date_directory=False)
-    
-    del_redis_set(set)
-    flash('Saved in {}'.format(dir))
-    
-  # Delete
-  elif request.form.get("action") == "delete":
-    dir = mediasort.move_all_in_set(set, config['delete_dir'], use_date_directory=False, use_name_directory=False)
-    
-    del_redis_set(set)
-    flash('Saved in {}'.format(dir))
-    
-  else:
-    flash("Nothing")
 
+  # The function that is executed in a thread
+  def actually_move(set, name):
+    # With date
+    if request.form.get("action") == "save_date" or request.form.get("action") == "save_no_date":
+        
+      set.set_name(name)
+      if request.form.get("action") == "save_date":
+        dir = mediasort.move_all_in_set(set, config['output_dir']) 
+      else:
+        dir = mediasort.move_all_in_set(set, config['output_dir'], use_date_directory=False)
+      
+      print('Files saved in {}'.format(dir))
+      
+    # Delete
+    elif request.form.get("action") == "delete":
+      dir = mediasort.move_all_in_set(set, config['delete_dir'], use_date_directory=False, use_name_directory=False)
+      
+      print('Files saved in {}'.format(dir))
+      
+    else:
+      print("Doing nothing, no command")
+
+  
+  # Perhaps optimistically, remove the information *before* it is actioned. We don't want have it interacted with again. If it goes wrong, it can be rescanned
+  print ("Removing set information from Redis")
+  redis_client.delete('set-{}'.format(set.id))
+  redis_client.srem('sets', set.id)
+  for name in redis_client.scan_iter(match='item-{}-*'.format(set.id)):
+    redis_client.delete(name)
+
+
+  print ("Starting new thread for set move")
+  flash("Moving set in background")
+  executor.submit(actually_move, set, str(request.form.get('name')))
+    
   return redirect(url_for('index'))
 
 @app.route('/names.json')

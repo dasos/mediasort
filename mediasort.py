@@ -45,7 +45,7 @@ class MediaItem:
        self.dest_counter = 0
      else:
        self.dest_counter += 1
-     self.dest_filename = "%s-%04d%s" % (self.dest_filename[:-9], self.dest_counter, self.dest_filename[-4:])
+     self.dest_filename = "%s-%04d%s" % (self.orig_filename[:-4], self.dest_counter, self.orig_filename[-4:])
    
    def __lt__(self, other):
      return self.timestamp < other.timestamp

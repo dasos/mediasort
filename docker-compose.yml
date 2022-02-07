@@ -15,10 +15,10 @@ services:
      - 8080:8080
     networks:
      - internal
-    volumes:
-     - /data/archive/photosort/input:/input
-     - /data/archive/output:/output
-     - /data/archive/photosort/delete:/delete
+    #volumes:
+     #- /input:/input
+     #- /output:/output
+     #- /delete:/delete
     environment:
      - 'SECRET_KEY=badSecretKey'
      - 'REDIS_URL=redis://redis:6379/0'

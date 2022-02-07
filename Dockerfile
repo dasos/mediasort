@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . ./
 
+COPY images /input
+
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8080
