@@ -1,13 +1,14 @@
 import mediasort
 import base64, json
 import itertools
-import os, pickle
+import os, pickle, logging
 #ImageFile.LOAD_TRUNCATED_IMAGES = True
 from io import BytesIO
 import requests
 from flask import Flask, render_template, request, flash, redirect, url_for, make_response, jsonify
 from flask_executor import Executor
 from flask_redis import FlaskRedis
+from codetiming import Timer
 
 #
 # Set up Flask
@@ -39,6 +40,13 @@ redis_client_pickled = FlaskRedis(app, decode_responses=False)
 app.config['EXECUTOR_PROPAGATE_EXCEPTIONS'] = True 
 executor = Executor(app)
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s - %(message)s'))
+logger.addHandler(ch)
+
 def load_config():
 
   config = { "input_dir": "/input", "output_dir": "/output", "delete_dir": "/delete", "thumbnails": 6, "suggestions": ["arthur", "henry"] }
@@ -47,9 +55,9 @@ def load_config():
       loaded = json.load(json_file)
       config.update(loaded)
   except Exception:
-    print ("No config.json file. Defaults will be used")
+    logger.warn ("No config.json file. Defaults will be used")
     
-  print(config["input_dir"])
+  logger.info(f'Using {config["input_dir"]} as the input directory')
     
   return config
 
@@ -57,7 +65,7 @@ def load_config():
 def initial_load():
   status = redis_client.get('status')
   if status == "loading":
-    print ("Unclean shutdown. Resetting flag")
+    logger.info("Unclean shutdown. Resetting flag")
     redis_client.set('status', '')
 
 
@@ -71,22 +79,23 @@ def populate_db(force=False):
   def load_data(input_dir):
     # Get all the sets as a list
     def save_item(item, set):
-      redis_client.hset('set-{}'.format(set.id), 'start', set.start.timestamp())
+      redis_client.hset(f'set-meta-{set.id}', 'start', set.start.timestamp())
       redis_client.sadd('sets', set.id)
-      redis_client.set('item-{}-{}'.format(set.id, item.id), pickle.dumps(item))
-      #print ('INSERTING: item-{}-{}'.format(item.set.id, item.id))
+      redis_client.sadd(f'set-list-{set.id}', item.id)
+      redis_client.set(f'item-{set.id}-{item.id}', pickle.dumps(item))
+      logger.debug(f'Inserting item id: {item.id} in to set: {set.id}');
       
     mediasort.load(config["input_dir"], save_item)
-    print ("Setting status as done.")
+    logging.info ("Setting status as done.")
     redis_client.set('status', 'done')
 
   status = redis_client.get('status')
   if status == "loading":
-    print ("Status is loading")
+    logger.info ("Status is loading")
     if force is False:
       return False
   
-  print ("Starting new thread for load")
+  logger.info ("Starting new thread for load")
   redis_client.set('status', 'loading')
   executor.submit(load_data, config["input_dir"])
   return
@@ -94,55 +103,62 @@ def populate_db(force=False):
 #
 # Looks in Redis for items with a matching set_id. Then dynamically makes a new set, and puts the unpickled items in it
 #
-
+@Timer(name="get_set", text="{name}: {:.4f} seconds")
 def get_set(set_id):
   
   set = None
 
-  for name in redis_client.scan_iter(match='item-{}-*'.format(set_id)):
-
+  for item_id in redis_client.smembers(f'set-list-{set_id}'):
+#  for name in redis_client.scan_iter(match=f'item-{set_id}-*', count=100):
+    logger.debug (f'Dealing with item-{set_id}-{item_id}')
     try:
-      item = pickle.loads(redis_client_pickled.get(name))
+      item = pickle.loads(redis_client_pickled.get(f'item-{set_id}-{item_id}'))
     except FileNotFoundError:
-      print ("File has gone away")
-      redis_client.delete(name)
+      logger.error (f'File has gone away: {item.orig_filename}')
+      redis_client.delete(f'item-{set_id}-{item_id}')
       continue
-      
+    
+    logger.info (f'Item: {item}')
     if set is None:
+      logger.debug ('Dynamically creating new set')
       set = mediasort.MediaSet(item)
       set.id = set_id
     else:
+      logger.debug ('Adding to existing set')
       set.add_item(item)
   
   if not set:
-    raise TypeError("Missing set. set_id: {}".format(set_id))
+    print (f'Missing set. set_id: {set_id}')
+    raise TypeError
+  
   
   # Resetting the start time, in case it has changed
-  redis_client.hset('set-{}'.format(set_id), 'start', set.start.timestamp())
+  redis_client.hset(f'set-meta-{set_id}', 'start', set.start.timestamp())
+  
+
   
   return set
 
 #
 # Unpickles a MediaItem from Redis
 #
+@Timer(name="get_item", text="{name}: {:.4f} seconds")
+def get_item(set_id, item_id): # TO DO, remove the need for set_id
+  return pickle.loads(redis_client_pickled.get(f'item-{set_id}-{item_id}'))
 
-def get_item(set_id, item_id):
-  return pickle.loads(redis_client_pickled.get('item-{}-{}'.format(set_id, item_id)))
-
-
+@Timer(name="get_sets", text="{name}: {:.4f} seconds")
 def get_sets(limit = 5):
   sets = []
-  for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0):
+  for s in redis_client.sort('sets', by='set-meta-*->start', num=limit, start=0):
     try:
       sets.append(get_set(s))
     except TypeError:
-      print ("Cleaning up set: {}".format(s))
-      redis_client.delete('set-{}'.format(s))
+      logger.error (f"Couldn't find set, so cleaning up {s}")
+      redis_client.delete('set-meta-{s}')
+      redis_client.delete('set-list-{s}')
       redis_client.srem('sets', s)
   
   return sets
-  
-  #return [get_set(s) for s in redis_client.sort('sets', by='set-*->start', num=limit, start=0)]
 
 #
 # Generates the basic HTML page
@@ -158,13 +174,13 @@ def index():
 
   return render_template('index.html', sets=sets, num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
 
-
+@Timer(name="reload", text="{name}: {:.4f} seconds")
 @app.route('/reload')
 def reload_data():
   
   status = redis_client.get('status')
   if status == "loading":
-    print ("Already loading");
+    logger.warning ("Already loading. To force, restart the app");
     flash("Already loading", 'warning')
     return redirect(url_for('index'))
     
@@ -174,6 +190,7 @@ def reload_data():
   for name in redis_client.scan_iter(match='item-*'):
     redis_client.delete(name)
 
+  # This deletes set-list-* and set-meta-*
   for name in redis_client.scan_iter(match='set-*'):
     redis_client.delete(name)  
 
@@ -191,7 +208,7 @@ def get_result():
 
   data = {
     'item_count': len(list(redis_client.scan_iter(match='item-*'))),
-    'set_count': len(list(redis_client.scan_iter(match='set-*'))),
+    'set_count': len(list(redis_client.scan_iter(match='set-meta-*'))),
     'status': redis_client.get('status')
   }
 
@@ -221,7 +238,7 @@ def get_location(set_id, photo_id):
     return ""
   
   rounded_coords = round(float(item.coords[0]), 5), round(float(item.coords[1]), 5)
-  rounded_coords_key = 'coord-{}-{}'.format(rounded_coords[0], rounded_coords[1])
+  rounded_coords_key = f'coord-{rounded_coords[0]}-{rounded_coords[1]}'
   
   if redis_client.exists(rounded_coords_key):
     return redis_client.get(rounded_coords_key)
@@ -277,20 +294,19 @@ def delete_from_set(set_id, photo_id):
   new_set = mediasort.MediaSet(item)
   
   # Update existing set, in case start time has changed
-  redis_client.hset('set-{}'.format(set.id), 'start', set.start.timestamp())
+  redis_client.hset(f'set-meta-{set.id}', 'start', set.start.timestamp())
   
   # Remove item
-  redis_client.delete('item-{}-{}'.format(set.id, item.id))
-  print("Removing item from Redis: item-{}-{}".format(set.id, item.id))
+  redis_client.srem(f'set-list-{set_id}', item.id)
+  logger.info(f"Removing item from Redis: item-{set.id}-{item.id}")
   
   # Add new set
-  redis_client.hset('set-{}'.format(new_set.id), 'start', new_set.start.timestamp())
   redis_client.sadd('sets', new_set.id)
-  redis_client.set('item-{}-{}'.format(new_set.id, item.id), pickle.dumps(item))
-  print("Adding item to Redis: item-{}-{}".format(new_set.id, item.id))
+  #don't need to do this, since this item isn't now changing redis_client.set('item-{}-{}'.format(new_set.id, item.id), pickle.dumps(item))
+  logger.info(f"Adding item to Redis: item-{new_set.id}-{item.id}")
   
   
-  flash('Removed {}'.format(item.dest_filename))
+  flash(f'Removed {item.dest_filename}')
   return redirect(url_for('index'))
 
 #
@@ -337,13 +353,13 @@ def post(set_id):
       else:
         dir = mediasort.move_all_in_set(set, config['output_dir'], use_date_directory=False)
       
-      print('Files saved in {}'.format(dir))
+      print(f'Files saved in {dir}')
       
     # Delete
     elif request.form.get("action") == "delete":
       dir = mediasort.move_all_in_set(set, config['delete_dir'], use_date_directory=False, use_name_directory=False)
       
-      print('Files saved in {}'.format(dir))
+      print(f'Files saved in {dir}')
       
     else:
       print("Doing nothing, no command")
@@ -351,9 +367,10 @@ def post(set_id):
   
   # Perhaps optimistically, remove the information *before* it is actioned. We don't want have it interacted with again. If it goes wrong, it can be rescanned
   print ("Removing set information from Redis")
-  redis_client.delete('set-{}'.format(set.id))
+  redis_client.delete(f'set-meta-{set.id}')
+  redis_client.delete(f'set-list-{set.id}')
   redis_client.srem('sets', set.id)
-  for name in redis_client.scan_iter(match='item-{}-*'.format(set.id)):
+  for name in redis_client.scan_iter(match=f'item-{set.id}-*'):
     redis_client.delete(name)
 
 
