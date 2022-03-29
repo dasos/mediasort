@@ -1,6 +1,6 @@
 exifread==2.3.2
 PyExifTool==0.5.2
-Flask==2.0.3
+Flask==2.1.0
 python-dateutil==2.8.2
 Pillow==9.0.1 
 gunicorn
