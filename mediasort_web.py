@@ -104,11 +104,12 @@ def populate_db(force=False):
 # Looks in Redis for items with a matching set_id. Then dynamically makes a new set, and puts the unpickled items in it
 #
 @Timer(name="get_set", text="{name}: {:.4f} seconds")
-def get_set(set_id):
+def get_set(set_id, start=0, limit=-1): # By default unlimited
   
   set = None
 
-  for item_id in redis_client.smembers(f'set-list-{set_id}'):
+  # Notice the limit here
+  for item_id in sorted(redis_client.smembers(f'set-list-{set_id}'))[start:limit]:
 #  for name in redis_client.scan_iter(match=f'item-{set_id}-*', count=100):
     logger.debug (f'Dealing with item-{set_id}-{item_id}')
     try:
@@ -123,9 +124,14 @@ def get_set(set_id):
       logger.debug ('Dynamically creating new set')
       set = mediasort.MediaSet(item)
       set.id = set_id
+      length = len(sorted(redis_client.smembers(f'set-list-{set_id}')))
+      set.length = length
+      logger.debug (f'Set length to {set.length}')
     else:
       logger.debug ('Adding to existing set')
       set.add_item(item)
+      # Need to reset the length to the full set
+      set.length = length
   
   if not set:
     print (f'Missing set. set_id: {set_id}')
@@ -147,16 +153,16 @@ def get_item(set_id, item_id): # TO DO, remove the need for set_id
   return pickle.loads(redis_client_pickled.get(f'item-{set_id}-{item_id}'))
 
 @Timer(name="get_sets", text="{name}: {:.4f} seconds")
-def get_sets(limit = 5):
+def get_sets(limit = 5, num_thumbnails = 10):
   sets = []
   for s in redis_client.sort('sets', by='set-meta-*->start', num=limit, start=0):
-    try:
-      sets.append(get_set(s))
-    except TypeError:
-      logger.error (f"Couldn't find set, so cleaning up {s}")
-      redis_client.delete('set-meta-{s}')
-      redis_client.delete('set-list-{s}')
-      redis_client.srem('sets', s)
+    #try:
+      sets.append(get_set(s, limit=num_thumbnails))
+    #except TypeError:
+    #  logger.error (f"Couldn't find set, so cleaning up {s}")
+    #  redis_client.delete('set-meta-{s}')
+    #  redis_client.delete('set-list-{s}')
+    #  redis_client.srem('sets', s)
   
   return sets
 
@@ -167,12 +173,13 @@ def get_sets(limit = 5):
 
 @app.route('/')
 def index():
-  sets = get_sets()
-  #if not sets:
-  #  print ("Could not find any sets in Redis. Attempting to refresh")
-  #  populate_db()
 
-  return render_template('index.html', sets=sets, num_thumbnails=config.get('thumbnails'), base_path=config.get("input_dir"))
+  num_thumbnails = config.get('thumbnails')
+
+  sets = get_sets(5, num_thumbnails)
+
+
+  return render_template('index.html', sets=sets, num_thumbnails=num_thumbnails, base_path=config.get("input_dir"))
 
 @Timer(name="reload", text="{name}: {:.4f} seconds")
 @app.route('/reload')
@@ -314,11 +321,14 @@ def delete_from_set(set_id, photo_id):
 #
 @app.route('/set/<int:set_id>')
 def more_thumbnails(set_id):
-  set = get_set(set_id)
-  if not set:
-    return 'Could not find set.', 400
+
   start = request.args.get('start', default = 0, type = int)
   end = request.args.get('end', default = 6, type = int)
+
+  
+  set = get_set(set_id, start, end)
+  if not set:
+    return 'Could not find set.', 400
   
   return render_template('thumbnails.html', set=set, start=start, end=end, base_path=config.get("input_dir"))
 

@@ -1,4 +1,4 @@
-{% for item in set.set[start:end] %}
+{% for item in set.set %}
   <div class="col-lg-4 col-md-6 col-12 mb-4">
 	  <div class="card h-100">
 		<a href="thumbnail/1200/{{ set.id }}/{{ item.id }}.jpg" target="_blank"><img src="thumbnail/{{ set.id }}/{{ item.id }}.jpg" loading="lazy" class="card-img-top" /></a>
@@ -40,7 +40,7 @@
 	  </div>
   </div>
 {% endfor %}
-{% if set.set | length > end %}
+{% if set.length > end %}
 <div class="container" id="pawn">
   <div class="row">
     <div class="col-12 text-right">

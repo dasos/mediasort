@@ -161,8 +161,8 @@ class MediaSet:
     def __init__(self, item: MediaItem, gap=2):
       self.gap = gap
       self.start = self.end = self._start = self._end = item.timestamp
-      self.__adjust_boundaries(item)
       self.set = [item]
+      self.__adjust_boundaries(item)
       self.id = id(self)
       self.name = ""
     
@@ -172,6 +172,8 @@ class MediaSet:
       
       self.start = min(item.timestamp, self.start)
       self.end = max(item.timestamp, self.end)
+      
+      self.length = len(self.set)
 
     def __recalculate_boundaries(self):
       self.start = self.end = self._start = self._end = random.choice(self.set).timestamp
