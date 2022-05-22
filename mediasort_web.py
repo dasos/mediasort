@@ -104,7 +104,7 @@ def populate_db(force=False):
 # Looks in Redis for items with a matching set_id. Then dynamically makes a new set, and puts the unpickled items in it
 #
 @Timer(name="get_set", text="{name}: {:.4f} seconds")
-def get_set(set_id, start=0, limit=-1): # By default unlimited
+def get_set(set_id, start=0, limit=None): # By default unlimited
   
   set = None
 
@@ -134,7 +134,7 @@ def get_set(set_id, start=0, limit=-1): # By default unlimited
       set.length = length
   
   if not set:
-    print (f'Missing set. set_id: {set_id}')
+    logger.error (f'Missing set. set_id: {set_id}')
     raise TypeError
   
   
@@ -241,7 +241,7 @@ def get_thumbnail(set_id, photo_id, size=300):
 def get_location(set_id, photo_id):
   item = get_item(set_id, photo_id)
   
-  if item.coords is None:
+  if not item.coords:
     return ""
   
   rounded_coords = round(float(item.coords[0]), 5), round(float(item.coords[1]), 5)
@@ -262,12 +262,10 @@ def request_location(coords):
   r = requests.get('https://photon.komoot.io/reverse', params=payload)
   
   if "features" not in r.json() or len(r.json()["features"]) != 1:
-    print (r.text)
+    logger.warning (f'Could not find location feature in : {r.text})
     return ""
     
   result = r.json()["features"][0]["properties"]
-  
-  print (result)
   
   if "name" in result:
     return result["name"]
@@ -305,11 +303,14 @@ def delete_from_set(set_id, photo_id):
   
   # Remove item
   redis_client.srem(f'set-list-{set_id}', item.id)
+  redis_client.delete(f'item-{set_id}-{item.id}')
   logger.info(f"Removing item from Redis: item-{set.id}-{item.id}")
   
   # Add new set
   redis_client.sadd('sets', new_set.id)
-  #don't need to do this, since this item isn't now changing redis_client.set('item-{}-{}'.format(new_set.id, item.id), pickle.dumps(item))
+  redis_client.sadd(f'set-list-{new_set.id}', item.id)
+  redis_client.hset(f'set-meta-{new_set.id}', 'start', new_set.start.timestamp())
+  redis_client.set(f'item-{new_set.id}-{item.id}', pickle.dumps(item))
   logger.info(f"Adding item to Redis: item-{new_set.id}-{item.id}")
   
   

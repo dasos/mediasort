@@ -123,8 +123,14 @@ class MediaItem:
    def __exiftool(self, filename):
      import exiftool
      
-     with exiftool.ExifTool() as e:
-       data = e.get_metadata(filename)
+     print (filename)
+     
+     try: 
+       with exiftool.ExifToolHelper() as e:
+         data = e.get_metadata(filename)
+     except exiftool.exceptions.ExifToolExecuteError:
+       print (f"Could not process file: {filename}")
+       return
      
      # Turn EXIF:DateTimeOriginal into EXIF DateTimeOriginal
      return {k.replace(":", " "):v for (k,v) in data.items()}
@@ -359,7 +365,7 @@ def load(input_dir, callback = None, all_sets = []):
       # Create the MediaItem
       try:
         item = MediaItem(path)
-      except ValueError:
+      except Exception:
         return None
       
       # Ignore invalid files
