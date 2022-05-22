@@ -262,7 +262,7 @@ def request_location(coords):
   r = requests.get('https://photon.komoot.io/reverse', params=payload)
   
   if "features" not in r.json() or len(r.json()["features"]) != 1:
-    logger.warning (f'Could not find location feature in : {r.text})
+    logger.warning (f'Could not find location feature in : {r.text}')
     return ""
     
   result = r.json()["features"][0]["properties"]
