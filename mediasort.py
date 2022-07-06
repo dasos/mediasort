@@ -214,7 +214,7 @@ class MediaSet:
       return [p.path for p in random.sample(self.set, min(len(self.set), number))]
     
     def date_directory(self):
-      return self.start.strftime("%Y/%Y-%b/%Y-%m-%d").strip()
+      return self.start.strftime("%Y/%Y-%m/%Y-%m-%d").strip()
       
       
       
