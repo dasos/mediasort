@@ -14,7 +14,7 @@ services:
      - /data/photos/delete:/delete
     environment:
      - 'SECRET_KEY=badSecretKey'
-     - 'REDIS_URL=redis://10.0.2.205:6379/0'
+     - 'REDIS_URL=redis://10.42.4.163:6379/0'
 
 networks:
  internal:

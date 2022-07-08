@@ -49,14 +49,12 @@ logger.addHandler(ch)
 
 def load_config():
 
-  config = { "input_dir": "/input", "output_dir": "/output", "delete_dir": "/delete", "thumbnails": 6, "suggestions": ["arthur", "henry"] }
-  try:
-    with open("config.json") as json_file:
-      loaded = json.load(json_file)
-      config.update(loaded)
-  except Exception:
-    logger.warn ("No config.json file. Defaults will be used")
-    
+  config = {
+  	"input_dir": os.environ.get("INPUT") if os.environ.get("INPUT") is not None else "/input",
+    "output_dir": os.environ.get("OUTPUT") if os.environ.get("OUTPUT") is not None else "/output",
+    "delete_dir": os.environ.get("DELETE") if os.environ.get("DELETE") is not None else "/delete",
+    "thumbnails": os.environ.get("THUMBNAILS") if os.environ.get("THUMBNAILS") is not None else 6,
+  }
   logger.info(f'Using {config["input_dir"]} as the input directory')
     
   return config
@@ -342,17 +340,6 @@ def more_thumbnails(set_id):
 @app.route('/set/<int:set_id>', methods=('POST',))
 def post(set_id):
 
-  try:
-    set = get_set(set_id)
-  except:
-    flash('Could not find set', 'warning')
-    return redirect(url_for('index'))
-    
-  if request.form.get("action") == "save_date" or request.form.get("action") == "save_no_date":
-    if not request.form.get('name'):
-      flash('You must provide a name to save', 'warning')
-      return redirect(url_for('index'))
-
   # The function that is executed in a thread
   def actually_move(set, name):
     # With date
@@ -375,15 +362,29 @@ def post(set_id):
     else:
       print("Doing nothing, no command")
 
-  
+  try:
+    set = get_set(set_id)
+  except:
+    flash('Could not find set', 'warning')
+    return redirect(url_for('index'))
+    
+  if request.form.get("action") == "save_date" or request.form.get("action") == "save_no_date":
+    if request.form.get('name'):
+      # Adding the name as a suggestion
+      redis_client.sadd('suggestions', request.form.get('name'))
+    else:
+      flash('You must provide a name to save', 'warning')
+      return redirect(url_for('index'))
+
   # Perhaps optimistically, remove the information *before* it is actioned. We don't want have it interacted with again. If it goes wrong, it can be rescanned
-  print ("Removing set information from Redis")
+  logger.info ("Removing set information from Redis")
   redis_client.delete(f'set-meta-{set.id}')
   redis_client.delete(f'set-list-{set.id}')
   redis_client.srem('sets', set.id)
   for name in redis_client.scan_iter(match=f'item-{set.id}-*'):
     redis_client.delete(name)
-
+    
+    
 
   print ("Starting new thread for set move")
   flash("Moving set in background")
@@ -391,9 +392,10 @@ def post(set_id):
     
   return redirect(url_for('index'))
 
-@app.route('/names.json')
+@app.route('/suggestions.json')
 def names():
-  return json.dumps(['Arthur', 'Henry', 'Cats']);
+  return json.dumps(list(redis_client.smembers('suggestions')))
+#  return json.dumps(['Arthur', 'Henry', 'Cats']);
 
 def make_thumbnail(filename, wh=300):
   from PIL import UnidentifiedImageError
@@ -422,4 +424,3 @@ def make_thumbnail_cv2(filename, wh):
   is_success, im_buf_arr = cv2.imencode(".jpg", im)
   return im_buf_arr.tobytes() 
 
-  
