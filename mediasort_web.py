@@ -63,7 +63,7 @@ def load_config():
 def initial_load():
   status = redis_client.get('status')
   if status == "loading":
-    logger.info("Unclean shutdown. Resetting flag")
+    logger.warning("Unclean shutdown. Resetting flag")
     redis_client.set('status', '')
 
 
@@ -402,7 +402,8 @@ def make_thumbnail(filename, wh=300):
   try:
     return make_thumbnail_pil(filename, wh)
   except UnidentifiedImageError:
-    return make_thumbnail_cv2(filename, wh)
+    logger.info("Could not generate thumbnail")
+    return ""
 
 def make_thumbnail_pil(filename, wh):
   from PIL import Image
@@ -413,14 +414,14 @@ def make_thumbnail_pil(filename, wh):
   im.save(buffered, format="JPEG")
   return buffered.getvalue()
   
-def make_thumbnail_cv2(filename, wh):
-  import cv2
-  video = cv2.VideoCapture(filename)
-  status, image = video.read()
-
-  width = wh
-  height = int(width * image.shape[0] / image.shape[1])
-  im = cv2.resize(image, (width, height), interpolation = cv2.INTER_AREA)
-  is_success, im_buf_arr = cv2.imencode(".jpg", im)
-  return im_buf_arr.tobytes() 
+#def make_thumbnail_cv2(filename, wh):
+#  import cv2
+#  video = cv2.VideoCapture(filename)
+#  status, image = video.read()
+#
+#  width = wh
+#  height = int(width * image.shape[0] / image.shape[1])
+#  im = cv2.resize(image, (width, height), interpolation = cv2.INTER_AREA)
+#  is_success, im_buf_arr = cv2.imencode(".jpg", im)
+#  return im_buf_arr.tobytes() 
 
