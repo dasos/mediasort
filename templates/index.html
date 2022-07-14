@@ -82,28 +82,22 @@
 </div>
 
 <script type="text/javascript">
-$('#confirmDelete').on('show.bs.modal', function (event) {
-  var id = $(event.relatedTarget).parent().find("input[name='set_id']").val()
-  $(this).find('.modal-dialog form').attr('action', '/set/' + id);
-});
 
-
-$(document).on('click', '.more-thumbnails', function(e) {
-	e.preventDefault();
-    var start = $(this).data('start');
-    var end = $(this).data('end');
-    var difference = end - start;
-    var target = $(this).closest("#pawn");
-	$.ajax({
-       url: '/set/' + $(this).data('set_id') + '?' + jQuery.param({start: start + difference, end: end + difference}),
-       success: function(result) {
-         target.replaceWith(result);
-		 resolveCoords()
-    }
-	});
-});
-
-function resolveCoords() {
+// Executed when more thumbails are loaded
+function updateThumbnails() {
+	
+	// Enable thumbnails
+	$(function () {
+	  $('[data-toggle="tooltip"]').tooltip()
+	})
+	
+	// Hides broken images
+	$('img').on('error', function() {
+	      $(this).hide();
+	      $(this).parent().next().removeClass("d-none");
+	})
+	
+	// Turns coords into a name. 
 	$('.coords').each(function() {
 
 		var target = $(this).find("span");
@@ -117,8 +111,33 @@ function resolveCoords() {
 		});
 	  });
 };
-resolveCoords();
+updateThumbnails();
 
+
+
+// Provides the confirm popup box
+$('#confirmDelete').on('show.bs.modal', function (event) {
+  var id = $(event.relatedTarget).parent().find("input[name='set_id']").val()
+  $(this).find('.modal-dialog form').attr('action', '/set/' + id);
+});
+
+// Gets more more thumbnails on click
+$(document).on('click', '.more-thumbnails', function(e) {
+	e.preventDefault();
+    var start = $(this).data('start');
+    var end = $(this).data('end');
+    var difference = end - start;
+    var target = $(this).closest("#pawn");
+	$.ajax({
+       url: '/set/' + $(this).data('set_id') + '?' + jQuery.param({start: start + difference, end: end + difference}),
+       success: function(result) {
+         target.replaceWith(result);
+		 updateThumbnails()
+    }
+	});
+});
+
+// Performs a status check on load
 $(function() {
   var statusCheck = function() {
     console.log('Sending AJAX request...');
@@ -140,7 +159,6 @@ $(function() {
   
   statusCheck();
 });
-
 
 
 <!-- The typeahead stuff -->
@@ -166,6 +184,12 @@ $('.typeahead').typeahead({
 
 
 </script>
+
+<style>
+div.striped > div:nth-of-type(odd) {
+    background: #eee;
+}
+</style>
 
 <!--
 <sdsfsdftyle>

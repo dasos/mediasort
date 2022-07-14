@@ -2,35 +2,32 @@
   <div class="col-lg-4 col-md-6 col-12 mb-4">
 	  <div class="card h-100">
 		<a href="thumbnail/1200/{{ set.id }}/{{ item.id }}.jpg" target="_blank"><img src="thumbnail/{{ set.id }}/{{ item.id }}.jpg" loading="lazy" class="card-img-top" /></a>
+		<div class="alert alert-warning text-center d-none" role="alert">No thumbnail available</div>
 		<!--<a class="remove-from-set" data-set="{{ set_id }}" data-item="{{ i }}" href="javascript:undefined"><i class="fas fa-unlink"></i></a>-->
 		<div class="card-body">
-		<table class="table table-condensed table-striped table-auto">
-			<tbody>
-				<tr>
-					<th>Filename</th>
-					<td class="text-right text-truncate" style="max-width: 200px;">{{ item.orig_filename }}</td>
-				</tr>
+			<div class="striped">
+				<div class="row py-2">
+					<div class="col-5 font-weight-bold">Filename</div>
+					<div class="col text-right text-truncate">{{ item.orig_filename }}</div>
+				</div>
 				{% if item.orig_directory is not equalto base_path %}
-				<tr>
-					<th>Directory</th>
-					<td class="text-right text-truncate" style="max-width: 200px;">{{ item.orig_directory | replace(base_path, "") }}</td>
-				</tr>
+				<div class="row py-2">
+					<div class="col-5 font-weight-bold">Directory</div>
+					<div class="col text-right text-truncate" data-toggle="tooltip" title="{{ item.orig_directory }}">{{ item.orig_directory | replace(base_path, "") }}</div>
+				</div>
 				{% endif %}
-				<tr>
-					<th>Location</th>
-					<td class="text-right text-truncate coords" style="max-width: 200px;" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
-						{% if item.coords %}
-						<a href="https://www.openstreetmap.org/?mlat={{ item.coords[0] }}&mlon={{ item.coords[1] }}#map=18/{{ item.coords[0] }}/{{ item.coords[1] }}" target="_BLANK"><span>{{ item.coords }}</span></a></td>
-						{% else %}
-						<span>{{ item.coords }}</span>
-						{% endif %}
-				</tr>
-				<tr>
-					<th>Date/time</th>
-					<td class="text-right text-truncate" style="max-width: 200px;">{{ item.timestamp }}</td>
-				</tr>
-			</tbody>
-		</table>
+				{% if item.coords %}
+				<div class="row py-2">
+					<div class="col-5 font-weight-bold">Location</div>
+					<div class="col text-right text-truncate" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
+						<a href="https://www.openstreetmap.org/?mlat={{ item.coords[0] }}&mlon={{ item.coords[1] }}#map=18/{{ item.coords[0] }}/{{ item.coords[1] }}" target="_BLANK"><span>{{ item.coords }}</span></a></div>
+				</div>
+				{% endif %}
+				<div class="row py-2">
+					<div class="col-5 font-weight-bold">Date/time</div>
+					<div class="col text-right text-truncate">{{ item.timestamp }}</div>
+				</div>
+			</div>
 		{% if set.length > 1 %}
 		<div class="float-right">
 			<form action="/remove/{{ set.id }}/{{ item.id }}" method="post" class="form-inline">
@@ -39,7 +36,7 @@
     	</div>
 		{% endif %}
 		</div>
-	  </div>
+		</div>
   </div>
 {% endfor %}
 {% if set.length > end %}

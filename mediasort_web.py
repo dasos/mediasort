@@ -242,7 +242,7 @@ def get_location(set_id, photo_id):
   if not item.coords:
     return ""
   
-  rounded_coords = round(float(item.coords[0]), 5), round(float(item.coords[1]), 5)
+  rounded_coords = round(float(item.coords[0]), 4), round(float(item.coords[1]), 4)
   rounded_coords_key = f'coord-{rounded_coords[0]}-{rounded_coords[1]}'
   
   if redis_client.exists(rounded_coords_key):
