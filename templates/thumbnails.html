@@ -19,7 +19,7 @@
 				{% if item.coords %}
 				<div class="row py-2">
 					<div class="col-5 font-weight-bold">Location</div>
-					<div class="col text-right text-truncate" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
+					<div class="col text-right text-truncate coords" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
 						<a href="https://www.openstreetmap.org/?mlat={{ item.coords[0] }}&mlon={{ item.coords[1] }}#map=18/{{ item.coords[0] }}/{{ item.coords[1] }}" target="_BLANK"><span>{{ item.coords }}</span></a></div>
 				</div>
 				{% endif %}
