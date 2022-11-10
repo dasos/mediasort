@@ -2,3 +2,4 @@ delete/
 input/
 output/
 more/
+**/__pycache__
