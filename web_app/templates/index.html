@@ -34,7 +34,18 @@
 	<div class="row">
 	{% set start = 0 %}
 	{% set end = num_thumbnails %}
-	{% include 'thumbnails.html' %}
+	{% for item in set.get_items() %}
+	{% include 'thumbnail.html' %}
+	{% endfor %}
+	{% if set.length > end %}
+	<div class="container" id="pawn">
+	  <div class="row">
+	    <div class="col-12 text-right">
+	      <button type="submit" class="btn btn-secondary more-thumbnails" data-set_id="{{ set.id }}" data-start="{{ start }}" data-end="{{ end }}"><i class="fas fa-chevron-circle-down"></i> More</button>
+	    </div>
+	  </div>
+	</div>
+	{% endif %}
 	</div>
 	</div>
 

@@ -1,5 +1,6 @@
 from MediaItem import MediaItem
-from MediaSet import MediaSet
+from MediaSet import MediaSet, MediaSetStore
+
 import datetime
   
 def test_set():
@@ -28,14 +29,13 @@ def test_reject():
   # Because i2 is too far away from i1 in time
   assert s.check_item_fits(i2) == False
 
-def test_add_wider_gap():
+def test_fits_wider_gap():
 
   i1 = MediaItem("images/leaf.jpg")
   s = MediaSet(i1, 4)
   i2 = MediaItem("images/forest.jpg")
-  result = s.add_item(i2)
 
-  assert s.length == 2 and result is True
+  assert s.check_item_fits(i2) == True
   
 def test_remove():
 
@@ -99,3 +99,25 @@ def test_boundary_contract():
   assert str(s._start) == '2022-01-01 10:00:00'
   assert str(s._end) == '2022-01-01 16:00:00'
   
+def test_store():
+  i1 = MediaItem("images/forest.jpg")
+  s = MediaSetStore(i1)
+  
+def test_add_store():
+  i1 = MediaItem("images/forest.jpg")
+  s = MediaSetStore(i1)
+  i2 = MediaItem("images/leaf.jpg")
+  s.add_item(i2)
+  
+  assert len(s.get_items()) == 2
+  
+  
+def test_remove_store():
+  i1 = MediaItem("images/forest.jpg")
+  s = MediaSetStore(i1)
+  i2 = MediaItem("images/leaf.jpg")
+  s.add_item(i2)
+  s.remove_item(i1)
+  
+  assert len(s.get_items()) == 1
+  assert s.get_items()[0].orig_filename == "leaf.jpg"

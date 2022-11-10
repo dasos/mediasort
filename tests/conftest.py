@@ -2,8 +2,7 @@ import os
 import tempfile
 
 import pytest
-from web_app import create_app, data
-from web_app.db import get_db
+from web_app import create_app, data, system
 
 
 @pytest.fixture
@@ -29,6 +28,6 @@ def redis_client(app):
     with app.test_request_context():
       data.populate_db()
   
-      redis_client = get_db()
+      redis_client = system.get_db()
   
       yield redis_client

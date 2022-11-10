@@ -1,7 +1,6 @@
-{% for item in set.set %}
   <div class="col-lg-4 col-md-6 col-12 mb-4">
 	  <div class="card h-100">
-		<a href="thumbnail/1200/{{ set.id }}/{{ item.id }}.jpg" target="_blank"><img src="thumbnail/{{ set.id }}/{{ item.id }}.jpg" loading="lazy" class="card-img-top" /></a>
+		<a href="thumbnail/1200/{{ item.id }}.jpg" target="_blank"><img src="thumbnail/{{ item.id }}.jpg" loading="lazy" class="card-img-top" /></a>
 		<div class="alert alert-warning text-center d-none" role="alert">No thumbnail available</div>
 		<!--<a class="remove-from-set" data-set="{{ set_id }}" data-item="{{ i }}" href="javascript:undefined"><i class="fas fa-unlink"></i></a>-->
 		<div class="card-body">
@@ -16,11 +15,12 @@
 					<div class="col text-right text-truncate" data-toggle="tooltip" title="{{ item.orig_directory }}">{{ item.orig_directory | replace(base_path, "") }}</div>
 				</div>
 				{% endif %}
-				{% if item.coords %}
+				{% set coords = item.get_coords() %}
+				{% if coords %}
 				<div class="row py-2">
 					<div class="col-5 font-weight-bold">Location</div>
 					<div class="col text-right text-truncate coords" data-set_id="{{ set.id }}" data-item_id="{{ item.id }}">
-						<a href="https://www.openstreetmap.org/?mlat={{ item.coords[0] }}&mlon={{ item.coords[1] }}#map=18/{{ item.coords[0] }}/{{ item.coords[1] }}" target="_BLANK"><span>{{ item.coords }}</span></a></div>
+						<a href="https://www.openstreetmap.org/?mlat={{ coords[0] }}&mlon={{ coords[1] }}#map=18/{{ coords[0] }}/{{ coords[1] }}" target="_BLANK"><span>{{ coords }}</span></a></div>
 				</div>
 				{% endif %}
 				<div class="row py-2">
@@ -38,13 +38,4 @@
 		</div>
 		</div>
   </div>
-{% endfor %}
-{% if set.length > end %}
-<div class="container" id="pawn">
-  <div class="row">
-    <div class="col-12 text-right">
-      <button type="submit" class="btn btn-secondary more-thumbnails" data-set_id="{{ set.id }}" data-start="{{ start }}" data-end="{{ end }}"><i class="fas fa-chevron-circle-down"></i> More</button>
-    </div>
-  </div>
-</div>
-{% endif %}
+

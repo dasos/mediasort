@@ -3,7 +3,7 @@ import os, exifread, datetime, sys
 class MediaItem:
    '''Represents a photo or a video.'''
    
-   def __init__(self, path, all_sets=False):
+   def __init__(self, path, ):
 
      self.path = path
      self.orig_filename = os.path.basename(path)
@@ -17,7 +17,6 @@ class MediaItem:
      # This will throw an exception if a timestamp cannot be extracted
      self.timestamp = self.get_timestamp()
 
-     self.coords = self.get_coords()
      self.id = hash(self.path) & sys.maxsize
      
 
