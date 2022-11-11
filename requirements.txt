@@ -1,5 +1,5 @@
 exifread==3.0.0
-PyExifTool==0.5.3
+PyExifTool==0.5.4
 Flask==2.2.2
 PyExifTool==0.5.4
 python-dateutil==2.8.2
