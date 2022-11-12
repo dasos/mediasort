@@ -1,6 +1,7 @@
 import logging
 from flask import current_app, g
 from flask_redis import FlaskRedis
+import requests
 
 def get_db():
 
@@ -38,6 +39,53 @@ def make_thumbnail_pil(filename, wh):
   im.save(buffered, format="JPEG")
   return buffered.getvalue()
   
+
+def get_location(coords):
+  
+  if not coords:
+    return ""
+  
+  redis_client = get_db()
+  
+  rounded_coords = round(float(coords[0]), 4), round(float(coords[1]), 4)
+  rounded_coords_key = f'coord-{rounded_coords[0]}-{rounded_coords[1]}'
+  
+  if redis_client.exists(rounded_coords_key):
+    result = redis_client.get(rounded_coords_key)
+    logging.getLogger("system.get_location").info(f'Pulled {result} from db location cache')
+    return redis_client.get(rounded_coords_key)
+  
+  result = request_location(rounded_coords)
+  
+  redis_client.set(rounded_coords_key, result)
+  logging.getLogger("system.get_location").info(f'Storing {result} in db location cache under {rounded_coords_key}')
+  
+  return result
+
+def request_location(coords):
+  payload = {'lat': coords[0], 'lon': coords[1]}
+  
+  try:
+    r = requests.get('https://photon.komoot.io/reverse', params=payload)
+  except Exception:
+    logging.getLogger("system.get_location").error('Error resolving coord')
+    return ''
+  
+  if "features" not in r.json() or len(r.json()["features"]) != 1:
+    logging.getLogger("system.get_location").warning (f'Could not find location feature in : {r.text}')
+    return ""
+    
+  result = r.json()["features"][0]["properties"]
+  
+  if "name" in result:
+    return result["name"]
+  
+  if "city" in result:
+    return result["city"]
+    
+  return result
+
+
 #def make_thumbnail_cv2(filename, wh):
 #  import cv2
 #  video = cv2.VideoCapture(filename)

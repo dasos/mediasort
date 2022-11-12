@@ -18,7 +18,7 @@ def index():
 
   sets = data.get_sets()
 
-  return render_template('index.html', sets=sets, num_thumbnails=num_thumbnails, base_path=base_path)
+  return render_template('index.html', sets=sets, num_thumbnails=num_thumbnails, base_path=base_path, get_location=system.get_location)
 
 
 @bp.route('/thumbnail/<int:item_id>.jpg')

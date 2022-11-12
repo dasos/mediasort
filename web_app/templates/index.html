@@ -108,19 +108,6 @@ function updateThumbnails() {
 	      $(this).parent().next().removeClass("d-none");
 	})
 	
-	// Turns coords into a name. 
-	$('.coords').each(function() {
-
-		var target = $(this).find("span");
-	  
-		$.ajax({
-		   url: '/location/' + $(this).data('set_id') + '/' + $(this).data('item_id'),
-		   success: function(result) {
-			 target.html(result);
-			 target.removeClass("coords");
-		}
-		});
-	});
 };
 updateThumbnails();
 

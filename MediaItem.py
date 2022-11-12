@@ -128,6 +128,8 @@ class MediaItem:
      return {k.replace(":", " "):v for (k,v) in data[0].items()}
      
 
+
+
    # def __exifread(self, filename, tags=['EXIF DateTimeOriginal', 'EXIF DateTimeDigitized', 'Image DateTime']):
      # import exifread
      

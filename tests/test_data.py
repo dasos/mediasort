@@ -4,20 +4,23 @@ import MediaFiles
 from web_app import data, system
 
 LIST_OF_MEDIAITEMS = ['images/calculator.jpg', 'images/dup1/leaf.jpg', 'images/dup2/leaf.jpg', 'images/forest.jpg', 'images/grass-video.mp4', 'images/leaf.jpg', 'images/snowy-forest.jpg']
-
+LENGTH_OF_MEDIAITEMS = len(LIST_OF_MEDIAITEMS)
 LIST_OF_FILES = sorted(['images/not_this'] + LIST_OF_MEDIAITEMS)
+LENGTH_OF_FILES = len(LIST_OF_FILES)
+
+LENGTH_OF_SETS = 4
 
 def test_find_files():
   l = sorted(list(MediaFiles.get_media('images')))
 
-  assert len(l) == 8
+  assert len(l) == LENGTH_OF_FILES
   assert l == LIST_OF_FILES
 
 def test_load_files():
   #for l, s in MediaFiles.load('images'):
   #  print(l, s)
   l, s = zip(*MediaFiles.load('images'))
-  assert len(l) == 7
+  assert len(l) == LENGTH_OF_MEDIAITEMS
   
   # Remove duplicates
   unique_s = []
@@ -25,7 +28,7 @@ def test_load_files():
     if i not in unique_s:
       unique_s.append(i)
       
-  assert len(unique_s) == 4
+  assert len(unique_s) == LENGTH_OF_SETS
 
 
 def test_load_files_redis(app):
@@ -39,12 +42,12 @@ def test_load_files_redis(app):
       
       # Get all the sets
       #assert len(list(redis_client.smembers('sets'))) == 3
-      assert len(list(redis_client.zrange('sets', 0, -1))) == 4
+      assert len(list(redis_client.zrange('sets', 0, -1))) == LENGTH_OF_SETS
       
-      assert redis_client.zcount('sets', '-inf', '+inf') == 4
+      assert redis_client.zcount('sets', '-inf', '+inf') == LENGTH_OF_SETS
       
       # Get all the items
-      assert len(list(redis_client.scan_iter(match=f'item-meta-*') )) == 7
+      assert len(list(redis_client.scan_iter(match=f'item-meta-*') )) == LENGTH_OF_MEDIAITEMS
       
 def test_get_item(redis_client):
   # Get all the items in the DB. Not useful for anything other than testing
