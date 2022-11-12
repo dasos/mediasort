@@ -3,14 +3,21 @@ from web_app import create_app
 import MediaFiles
 from web_app import data, system
 
+LIST_OF_MEDIAITEMS = ['images/calculator.jpg', 'images/dup1/leaf.jpg', 'images/dup2/leaf.jpg', 'images/forest.jpg', 'images/grass-video.mp4', 'images/leaf.jpg', 'images/snowy-forest.jpg']
+
+LIST_OF_FILES = sorted(['images/not_this'] + LIST_OF_MEDIAITEMS)
+
 def test_find_files():
-  assert list(MediaFiles.get_media('images')) == ['images/forest.jpg', 'images/calculator.jpg', 'images/snowy-forest.jpg', 'images/leaf.jpg', 'images/dup1/leaf.jpg', 'images/dup2/leaf.jpg']
+  l = sorted(list(MediaFiles.get_media('images')))
+
+  assert len(l) == 8
+  assert l == LIST_OF_FILES
 
 def test_load_files():
   #for l, s in MediaFiles.load('images'):
   #  print(l, s)
   l, s = zip(*MediaFiles.load('images'))
-  assert len(l) == 6
+  assert len(l) == 7
   
   # Remove duplicates
   unique_s = []
@@ -18,7 +25,7 @@ def test_load_files():
     if i not in unique_s:
       unique_s.append(i)
       
-  assert len(unique_s) == 3
+  assert len(unique_s) == 4
 
 
 def test_load_files_redis(app):
@@ -32,12 +39,12 @@ def test_load_files_redis(app):
       
       # Get all the sets
       #assert len(list(redis_client.smembers('sets'))) == 3
-      assert len(list(redis_client.zrange('sets', 0, -1))) == 3
+      assert len(list(redis_client.zrange('sets', 0, -1))) == 4
       
-      assert redis_client.zcount('sets', '-inf', '+inf') == 3
+      assert redis_client.zcount('sets', '-inf', '+inf') == 4
       
       # Get all the items
-      assert len(list(redis_client.scan_iter(match=f'item-meta-*') )) == 6
+      assert len(list(redis_client.scan_iter(match=f'item-meta-*') )) == 7
       
 def test_get_item(redis_client):
   # Get all the items in the DB. Not useful for anything other than testing
@@ -77,4 +84,4 @@ def test_get_item_path(redis_client):
     p1 = redis_client.hget(name, 'path')
     p2 = data.get_item_path(item_id)
     assert p1 == p2
-    assert p1 in ['images/forest.jpg', 'images/leaf.jpg', 'images/calculator.jpg',  'images/snowy-forest.jpg', 'images/dup1/leaf.jpg', 'images/dup2/leaf.jpg']
+    assert p1 in LIST_OF_FILES

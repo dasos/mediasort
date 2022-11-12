@@ -71,12 +71,13 @@ def populate_db(force=False):
 #    if force is False:
 #      return False
   
-  current_app.logger.info ("Starting new thread for load")
+  print ("LOADING")
   redis_client.set('status', 'loading')
   
   if current_app.testing:
     load_data(current_app.config.get('INPUT_DIR'))
   else:
+    current_app.logger.info ("Starting new thread for load")
     executor = Executor(current_app)
     executor.submit(load_data, current_app.config.get('INPUT_DIR'))
   return

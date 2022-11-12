@@ -31,3 +31,26 @@ def redis_client(app):
       redis_client = system.get_db()
   
       yield redis_client
+      
+
+@pytest.fixture
+def client_data(app):
+  with app.app_context():
+    
+    data.populate_db()
+
+    yield app.test_client()
+
+@pytest.fixture
+def client_data_with_items(app):
+  with app.app_context():
+    
+    data.populate_db()
+    
+    redis_client = system.get_db()
+    
+    items = []
+    for name in redis_client.scan_iter(match='item-meta-*'):
+      items.append(redis_client.hgetall(name))
+
+    yield app.test_client(), items

@@ -1,3 +1,4 @@
+import logging
 from flask import current_app, g
 from flask_redis import FlaskRedis
 
@@ -26,7 +27,7 @@ def make_thumbnail(filename, wh=300):
   try:
     return make_thumbnail_pil(filename, wh)
   except UnidentifiedImageError:
-    logger.info("Could not generate thumbnail")
+    logging.getLogger("system.make_thumbnail").info("Could not generate thumbnail")
     return ""
 
 def make_thumbnail_pil(filename, wh):

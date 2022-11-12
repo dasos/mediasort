@@ -1,4 +1,4 @@
-import os
+import os, logging
 from MediaItem import MediaItem
 from MediaSet import MediaSet
 
@@ -13,6 +13,7 @@ def load(input_dir, all_sets = []):
   Then yield each that a new item has been processed'''
 
   print ("Loading data. This may take some time.")
+  l = logging.getLogger("MediaFiles.load")
   # Get everything
   
   def upsert_set(item, all_sets):
@@ -41,12 +42,13 @@ def load(input_dir, all_sets = []):
     return set
   
   def create_sort_send(path):
-    print (path)
+    l.debug(f"Loading path: {path}")
     # Create the MediaItem
-    #try:
-    item = MediaItem(path)
-    #except Exception:
-    #  return None, None
+    try:
+      item = MediaItem(path)
+    except Exception:
+      l.warning(f"Unable to add file")
+      return None, None
     
     # Ignore invalid files
     

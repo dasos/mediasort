@@ -3,14 +3,17 @@ from types import SimpleNamespace
 
 class MediaSet:
   '''Represents a set of MediaItems, x hours apart. It only stores a dict of filenames and timestamps, to allow for the boundary expansion.
-  If no item is passed in, a fake one will be made'''
+  If no item is passed in, an empty one will be made, but it means there are no start, end and things could break'''
   
-  def __init__(self, item: MediaItem = SimpleNamespace(path = 'FAKE', timestamp = datetime.datetime.now()), gap=2):
+  def __init__(self, item: MediaItem = None, gap=2):
     self.gap = gap
-    self.start = self.end = self._start = self._end = item.timestamp
-    self.__items = {item.path : item.timestamp}
-    self.__adjust_boundaries(item.timestamp)
     self.id = id(self)
+    self.length = 0
+    self.__items = {}
+    if item is None:
+      return
+    self.start = self.end = self._start = self._end = item.timestamp
+    self.add_item(item)
     self.name = ""
   
   def __adjust_boundaries(self, t):
@@ -81,8 +84,8 @@ class MediaSet:
 class MediaSetStore (MediaSet):
   '''Builds on the MediaSet. Actually stores the MediaItems themselves as well in the set'''
   def __init__(self, item: MediaItem, gap=2):
+    self.__item_store = []
     super().__init__(item, gap)
-    self.__item_store = [item]
     
   def add_item(self, item: MediaItem):
     super().add_item(item)

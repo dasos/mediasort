@@ -1,0 +1,5 @@
+[run]
+branch = True
+# Gonna pretend this doesn't exist for now
+omit = mediasort_cli.py
+source = .
