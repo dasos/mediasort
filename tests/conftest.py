@@ -21,6 +21,10 @@ def app():
 def client(app):
     return app.test_client()
 
+@pytest.fixture
+def client_in_request(app):
+  with app.test_request_context():
+    yield app.test_client()
 
 @pytest.fixture
 def redis_client(app):
@@ -42,15 +46,14 @@ def client_data(app):
     yield app.test_client()
 
 @pytest.fixture
-def client_data_with_items(app):
+def client_tuple_data(app):
   with app.app_context():
     
     data.populate_db()
     
     redis_client = system.get_db()
     
-    items = []
-    for name in redis_client.scan_iter(match='item-meta-*'):
-      items.append(redis_client.hgetall(name))
-
-    yield app.test_client(), items
+    items = [redis_client.hgetall(name) for name in redis_client.scan_iter(match='mediasort:item-meta-*')]
+    sets = [redis_client.hgetall(name) for name in redis_client.scan_iter(match='mediasort:set-meta-*')]
+    
+    yield app.test_client(), items, sets

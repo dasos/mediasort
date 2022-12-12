@@ -5,7 +5,7 @@ class MediaItem:
    
    def __init__(self, path, ):
 
-     self.l = logging.getLogger("MediaItem")
+     self.l = logging.getLogger("mediasort.MediaItem")
      self.path = path
      self.orig_filename = os.path.basename(path)
      self.orig_directory = os.path.dirname(path)
@@ -26,13 +26,6 @@ class MediaItem:
      #return "<MediaItem {} {} {}>".format(self.path, self.hash, self.timestamp)
      return "<MediaItem path:{} timestamp:{} id:{}>".format(self.path, self.timestamp, id(self))
 
-
-   def find_alternate_filename(self):
-     if self.dest_counter is None:
-       self.dest_counter = 0
-     else:
-       self.dest_counter += 1
-     self.dest_filename = "%s-%04d%s" % (self.orig_filename[:-4], self.dest_counter, self.orig_filename[-4:])
    
    def __lt__(self, other):
      return self.timestamp < other.timestamp
@@ -57,6 +50,27 @@ class MediaItem:
 
    def get_timestamp(self):
      return datetime.datetime.strptime(self.__read_timestamp(), '%Y:%m:%d %H:%M:%S')
+
+
+   def move(self, folder_name, dry_run=False):
+
+    while os.path.exists(os.path.join(folder_name, self.dest_filename)):
+      self.find_alternate_filename()
+    
+    dest = os.path.join(folder_name, self.dest_filename)
+    self.l.info(f"{self.path} > {dest}")
+    
+    if (dry_run):
+      return
+    
+    shutil.move(self.path, dest)
+
+   def find_alternate_filename(self):
+     if self.dest_counter is None:
+       self.dest_counter = 0
+     else:
+       self.dest_counter += 1
+     self.dest_filename = "%s-%04d%s" % (self.orig_filename[:-4], self.dest_counter, self.orig_filename[-4:])
    
    def get_coords(self):
      # It looks like this doesn't exist in most files. So lets just skip doing it
@@ -70,7 +84,7 @@ class MediaItem:
    def __read_timestamp(self):
      tag = self.__get_tag(['EXIF DateTimeOriginal', 'EXIF DateTimeDigitized', 'Image DateTime', 'QuickTime MediaCreateDate'])
      if tag is None:
-       self.l.warn(f"No tag in: {self.path}")
+       self.l.warning(f"No tag in: {self.path}")
        raise ValueError
      return str(tag)
      
@@ -88,10 +102,12 @@ class MediaItem:
        exif = self.__exifread(self.path)
      
        if not exif:
+         self.l.warning("Falling back to exiftool")
          exif = self.__exiftool(self.path)
+         self.l.warning (self.path)
 
      except FileNotFoundError:
-       self.l.warn("FileNotFound. It is likely that exiftool has not been installed properly!")
+       self.l.warning("FileNotFound. It is likely that exiftool has not been installed properly!")
 #       print ("Could not open file: {}".format(self.path))
        raise FileNotFoundError
    
@@ -112,15 +128,16 @@ class MediaItem:
      
    def __exiftool(self, filename):
      import exiftool
-     
+
      try: 
        with exiftool.ExifToolHelper() as e:
          data = e.get_metadata(filename)
      except exiftool.exceptions.ExifToolExecuteError:
-       print (f"Could not process file: {filename}")
+       self.l.warning (f"Could not process file: {filename}")
        return
+    
      
-     self.l.debug(f"EXIF Tool data: {data}")
+     #self.l.debug(f"EXIF Tool data: {data}")
      
      # Turn EXIF:DateTimeOriginal into EXIF DateTimeOriginal
      # Why does this think "filename" is an iterable? (If it is, then a list is returned)

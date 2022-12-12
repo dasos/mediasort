@@ -1,7 +1,6 @@
-from web_app import create_app
+from web_app import create_app, data, system
 
 import MediaFiles
-from web_app import data, system
 
 LIST_OF_MEDIAITEMS = ['images/calculator.jpg', 'images/dup1/leaf.jpg', 'images/dup2/leaf.jpg', 'images/forest.jpg', 'images/grass-video.mp4', 'images/leaf.jpg', 'images/snowy-forest.jpg']
 LENGTH_OF_MEDIAITEMS = len(LIST_OF_MEDIAITEMS)
@@ -38,20 +37,20 @@ def test_load_files_redis(app):
       
       redis_client = system.get_db()
       
-      print (list(redis_client.zrange('sets', 0, -1)))
+      print (list(redis_client.zrange('mediasort:sets', 0, -1)))
       
       # Get all the sets
       #assert len(list(redis_client.smembers('sets'))) == 3
-      assert len(list(redis_client.zrange('sets', 0, -1))) == LENGTH_OF_SETS
+      assert len(list(redis_client.zrange('mediasort:sets', 0, -1))) == LENGTH_OF_SETS
       
-      assert redis_client.zcount('sets', '-inf', '+inf') == LENGTH_OF_SETS
+      assert redis_client.zcount('mediasort:sets', '-inf', '+inf') == LENGTH_OF_SETS
       
       # Get all the items
-      assert len(list(redis_client.scan_iter(match=f'item-meta-*') )) == LENGTH_OF_MEDIAITEMS
+      assert len(list(redis_client.scan_iter(match=f'mediasort:item-meta-*') )) == LENGTH_OF_MEDIAITEMS
       
 def test_get_item(redis_client):
   # Get all the items in the DB. Not useful for anything other than testing
-  for name in redis_client.scan_iter(match=f'item-meta-*'):
+  for name in redis_client.scan_iter(match=f'mediasort:item-meta-*'):
     item_id = redis_client.hget(name, 'id')
     path = redis_client.hget(name, 'path')
     item = data.get_item(item_id)
@@ -59,28 +58,28 @@ def test_get_item(redis_client):
 
 def test_get_sets(redis_client):
   # Get all the sets in the DB.
-  for set_id in redis_client.zrange(f'sets', 0, -1):
+  for set_id in redis_client.zrange(f'mediasort:sets', 0, -1):
     set = data.get_set(set_id)
     assert set.length >= 1
     
     # Checks the length of the set now against when it was made
-    assert set.length == int(redis_client.hget(f'set-meta-{set_id}', 'length'))
+    assert set.length == int(redis_client.hget(f'mediasort:set-meta-{set_id}', 'length'))
     
     
 def test_get_empty(redis_client):
   # Get all the sets in the DB, but make them empty
-  for set_id in redis_client.zrange(f'sets', 0, -1):
+  for set_id in redis_client.zrange(f'mediasort:sets', 0, -1):
     set = data.get_empty_set(set_id)
     assert set.length >= 1
     
     
     # Checks the length of the set now against when it was made
-    assert set.length == int(redis_client.hget(f'set-meta-{set_id}', 'length'))
-    assert set.start.timestamp() == int(redis_client.hget(f'set-meta-{set_id}', 'start'))
+    assert set.length == int(redis_client.hget(f'mediasort:set-meta-{set_id}', 'length'))
+    assert set.start.timestamp() == int(redis_client.hget(f'mediasort:set-meta-{set_id}', 'start'))
     
 def test_get_item_path(redis_client):
   # Get all the items in the DB. Not useful for anything other than testing
-  for name in redis_client.scan_iter(match=f'item-meta-*'):
+  for name in redis_client.scan_iter(match=f'mediasort:item-meta-*'):
 
     item_id = redis_client.hget(name, 'id')
     

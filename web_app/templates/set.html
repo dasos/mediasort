@@ -1,0 +1,42 @@
+<div class="pawn card bg-light pb-2" id="set-{{ set.id }}">
+    <div class="container mt-2">
+      <div class="row">
+        <div class="col-8"><h4>{{ set.start.strftime("%A %-d %B %Y at %H:%M") }}{% if set.start != set.end %} - {{ set.end.strftime("%H:%M") }}{% endif %}</h4>
+        </div>
+        <div class="col-4 text-right">
+	      <span class="badge badge-primary"  data-toggle="tooltip" title="Set ID: {{ set.id }}">{{ set.length }} photo{% if set.length > 1 %}s{% endif %}</span>
+	    </div>
+	  </div>
+	</div>
+
+	<div class="container row">
+	{% set items = set.get_items()  %}
+	{% set mid_point = ((items|length / 2) | int) %} 
+	
+	{% for item in items %}
+		{% include 'thumbnail.html' %}
+		{% if loop.index == mid_point and set.length > items|length %}
+			<div class="col-12 text-center">
+			{% if no_more %}
+				<span class="badge badge-secondary" data-toggle="tooltip" title="Some thumbnails are not shown to improve performance.">...</span>
+			{% else %}
+				<button type="submit" class="btn btn-secondary more-thumbnails" data-set_id="{{ set.id }}"><i class="fas fa-exchange-alt"></i> Load all</button>
+			{% endif %}
+			</div>
+		{% endif %}
+		
+	{% endfor %}
+
+	</div>
+
+  <div class="container">
+  <form class="form-inline">
+     <label class="sr-only" for="name">Name</label>
+     <input type="text" name="name" placeholder="Name" class="form-control typeahead" value="{{ set.name }}" autocomplete="off" />
+	 <input type="hidden" name="set_id" value="{{ set.id }}">
+     <button type="button" name="action" value="save_date" class="btn btn-primary ml-2 action-button"><i class="fas fa-calendar-day"></i> Save with date</button>
+     <button type="button" name="action" value="save_no_date" class="btn btn-secondary ml-2 action-button"><i class="fas fa-calendar-times"></i> Save without date</button>
+     <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#confirmDelete"><i class="fas fa-trash-alt"></i> Delete</button>
+  </form>
+  </div>
+</div>

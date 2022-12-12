@@ -9,7 +9,14 @@ def test_set():
   s = MediaSet(i)
   
   assert s.length == 1
+
+
+def test_print():
+
+  i = MediaItem("images/leaf.jpg")
+  s = MediaSet(i)
   
+  assert str(s)  
   
 def test_add():
 

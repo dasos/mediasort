@@ -14,10 +14,10 @@ def test_index(client_data):
   assert b"save" in response.data
   assert b"2022-01-01" in response.data
   
-def test_thumbnail(client_data_with_items):
+def test_thumbnail(client_tuple_data):
   
   # Unpack the tuple
-  client_data, items = client_data_with_items
+  client_data, items, _ = client_tuple_data
   
   for x in items:
     if "jpg" in x['path']:
@@ -29,3 +29,16 @@ def test_thumbnail(client_data_with_items):
   
   assert response.status_code == 200
   assert response.calculate_content_length() > 1000
+  
+def test_get_set(client_tuple_data):
+  
+  # Unpack the tuple
+  client_data, _, sets = client_tuple_data
+  
+  print (sets)
+  
+  response = client_data.get(f'/set/{sets[0]["id"]}')
+  
+  
+  assert response.status_code == 200
+  assert b"save" in response.data

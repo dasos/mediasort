@@ -12,8 +12,8 @@ def load(input_dir, all_sets = []):
   '''Reads the files, and organises them into sets. 
   Then yield each that a new item has been processed'''
 
-  print ("Loading data. This may take some time.")
-  l = logging.getLogger("MediaFiles.load")
+  l = logging.getLogger("mediasort.MediaFiles.load")
+  l.info("Loading data. This may take some time.")
   # Get everything
   
   def upsert_set(item, all_sets):
@@ -34,7 +34,7 @@ def load(input_dir, all_sets = []):
     if not found:
       set = MediaSet(item)
       all_sets.append(set)
-      print ("Made new set: {}".format(len(all_sets)))
+      l.info("Made new set: {}".format(len(all_sets)))
    
     # Sorting every time since the start of a set may have changed
     all_sets.sort()
@@ -47,7 +47,7 @@ def load(input_dir, all_sets = []):
     try:
       item = MediaItem(path)
     except Exception:
-      l.warning(f"Unable to add file")
+      l.warning(f"Unable to add file: {path}")
       return None, None
     
     # Ignore invalid files
@@ -64,4 +64,4 @@ def load(input_dir, all_sets = []):
       yield item, set
 
   
-  print ("Done. Number of sets: {}".format(len(all_sets)))
+  l.info("Done. Number of sets: {}".format(len(all_sets)))

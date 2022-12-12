@@ -3,3 +3,5 @@ input/
 output/
 more/
 **/__pycache__
+.coverage
+htmlcov

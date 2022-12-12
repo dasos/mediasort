@@ -1,4 +1,4 @@
-import MediaItem, datetime, random
+import MediaItem, datetime, os, re, random
 from types import SimpleNamespace
 
 class MediaSet:
@@ -51,34 +51,20 @@ class MediaSet:
     self.__recalculate_boundaries()
   
   def check_item_fits(self, item: MediaItem):
-    # This will reject the item if it falls outside of the boundaries
+    '''This will reject the item if it falls outside of the boundaries'''
     return (item.timestamp > self._start and item.timestamp < self._end)
-    
+  
+  def check_item_exists(self, item: MediaItem):
+    '''This sees if this MediaItem already sits in this set'''  
+    return (item.path in self.__items)
   
   def add_item(self, item: MediaItem):
   
     self.__items.update({item.path : item.timestamp})
-    self.__adjust_boundaries(item.timestamp)
+    self.__adjust_boundaries(item.timestamp)  
     
-#    def merge(self, another):
-#      self.start = min(another.start, self.start)
-#      self.end = max(another.end, self.end)
-#      self.set.extend(another.set)
-
-
-
-  
-  def date_directory(self):
-    return self.start.strftime("%Y/%Y-%m/%Y-%m-%d").strip()
-    
-    
-    
-  def __repr__(self):
-    return "<MediaSet: {} {} >".format(self.name, ''.join(str(i) for i in self.set))
-  
   def __str__(self):
-    return f'Length of set: {len(self.set)}. Boundary: {self._start} - {self._end}. Actual: {self.start} - {self.end}'
-    return "{} in set. Sample filenames: ".format(len(self.set)) + '; '.join(self.sample_filenames())
+    return f'Length of set: {self.length}. Boundary: {self._start} - {self._end}. Actual: {self.start} - {self.end}'
 
 
 class MediaSetStore (MediaSet):
@@ -96,4 +82,25 @@ class MediaSetStore (MediaSet):
     self.__item_store.remove(item)
     
   def get_items(self):
-    return self. __item_store
+    return self.__item_store
+  
+  def move(self, output_dir, use_date_directory=True, use_name_directory=True, dry_run=False):
+  
+    if (use_date_directory and use_name_directory):
+      directory = os.path.join(output_dir, f"{self.date_directory()} {self.name}")
+    elif (use_date_directory):
+      directory = os.path.join(output_dir, self.date_directory())
+    elif (use_name_directory):
+      directory = os.path.join(output_dir, self.name)
+    else:
+      directory = output_dir
+      
+    if (not dry_run):
+      os.makedirs(directory, exist_ok=True)
+    
+    [item.move(directory, dry_run) for item in self.__item_store]
+    
+    return directory
+    
+  def date_directory(self):
+    return self.start.strftime("%Y/%Y-%m/%Y-%m-%d").strip()
