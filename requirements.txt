@@ -11,3 +11,5 @@ codetiming
 pytest
 fakeredis
 pytest-cov
+flake8
+black
