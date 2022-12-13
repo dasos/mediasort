@@ -7,21 +7,21 @@ services:
     expose:
      - 6379
     networks:
-     - internal
+     - mediasort
 
   app:
-    image: photosort
+    image: dasos/mediasort
     ports:
-     - 8080:8080
+     - 8000:8080
     networks:
-     - internal
+     - mediasort
     #volumes:
      #- /input:/input
      #- /output:/output
      #- /delete:/delete
     environment:
-     - 'SECRET_KEY=badSecretKey'
-     - 'REDIS_URL=redis://redis:6379/0'
+     - 'FLASK_REDIS_URL=redis://redis:6379/0'
+     - 'FLASK_DRY_RUN=TRUE'
 
 networks:
- internal:
+ mediasort:

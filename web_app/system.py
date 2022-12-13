@@ -16,7 +16,7 @@ def get_db():
     #g.redis_client = fakeredis.FakeRedis()
     g.redis_client = FlaskRedis.from_custom_provider(fakeredis.FakeRedis, current_app, decode_responses=True)
   else:
-    # For most Redis requests
+    # For most Redis requests. It uses the REDIS_URL config property automatically
     g.redis_client = FlaskRedis(current_app, decode_responses=True)
 
   return g.redis_client
