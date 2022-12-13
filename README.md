@@ -57,6 +57,6 @@ Auto-formatting is achieved using Black:
 
     python3 -m black .
 
-And making sure you follow the PEPs is done with Flake8. (Note that E501 (long lines) is ignored.)
+And making sure you follow PEP 8 is done with Flake8, with the adjustments that Black recommend.
 
     python3 -m flake8
