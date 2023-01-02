@@ -1,6 +1,6 @@
 exifread==3.0.0
 Flask==2.2.2
-PyExifTool==0.5.4
+PyExifTool==0.5.5
 python-dateutil==2.8.2
 Pillow==9.4.0 
 gunicorn
