@@ -16,7 +16,6 @@ class MediaSet:
         self.__items = {}
         if item is None:
             return
-        self.start = self.end = self._start = self._end = item.timestamp
         self.add_item(item)
         self.name = ""
 
@@ -63,6 +62,9 @@ class MediaSet:
         return item.path in self.__items
 
     def add_item(self, item: MediaItem):
+    
+        if self.length == 0:
+          self.start = self.end = self._start = self._end = item.timestamp
 
         self.__items.update({item.path: item.timestamp})
         self.__adjust_boundaries(item.timestamp)
@@ -74,7 +76,7 @@ class MediaSet:
 class MediaSetStore(MediaSet):
     """Builds on the MediaSet. Actually stores the MediaItems themselves as well in the set"""
 
-    def __init__(self, item: MediaItem, gap=2):
+    def __init__(self, item: MediaItem = None, gap=2):
         self.__item_store = []
         super().__init__(item, gap)
 
@@ -88,6 +90,11 @@ class MediaSetStore(MediaSet):
 
     def get_items(self):
         return self.__item_store
+
+    def get_item_by_id(self, item_id):
+        for i in self.__item_store:
+          if i.id == item_id:
+            return i
 
     def move(
         self,

@@ -68,7 +68,7 @@ def reload_data():
     )
 
 
-@bp.route("/set/<string:action>/<int:set_id>", methods=("POST",))
+@bp.route("/set/<string:action>/<string:set_id>", methods=("POST",))
 def move_set(action, set_id):
 
     logger = logging.getLogger("mediasort.api.move_set")
@@ -80,13 +80,7 @@ def move_set(action, set_id):
 
         def remove_from_db():
             # Perhaps optimistically, remove the information *before* it is actioned. We don't want to interact with it again. If it goes wrong, it can be rescanned
-            logger.info("Removing set information from Redis")
-            logger.debug(f"Set id: {set.id}")
-            redis_client.zrem("mediasort:sets", set.id)
-            redis_client.delete(f"mediasort:set-meta-{set.id}")
-            for item_id in redis_client.zrange(f"mediasort:set-items-{set_id}", 0, -1):
-                redis_client.delete(f"mediasort:item-meta-{item_id}")
-            redis_client.delete(f"mediasort:set-items-{set.id}")
+            data.remove_set(set)
 
         # With date
         if "save" in action:
@@ -116,7 +110,7 @@ def move_set(action, set_id):
     set = data.get_set(set_id, store=True)
     if set is None:
         logger.warning(f"Could not find set id: {set_id}")
-        return jsonify(data={"error": "Could not find set"})
+        return jsonify(data={"error": "Could not find set"}), 500
 
     logger.debug(f"Moving set: {set}")
     name = str(request.form.get("name"))
@@ -140,7 +134,6 @@ def move_set(action, set_id):
             "result": "OK",
         }
     )
-
 
 @bp.route("/suggestions")
 def suggestions():

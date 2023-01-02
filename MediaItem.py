@@ -31,7 +31,7 @@ class MediaItem:
     def __repr__(self):
         # return "<MediaItem {} {} {}>".format(self.path, self.hash, self.timestamp)
         return "<MediaItem path:{} timestamp:{} id:{}>".format(
-            self.path, self.timestamp, id(self)
+            self.path, self.timestamp, self.id
         )
 
     def __lt__(self, other):

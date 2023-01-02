@@ -29,7 +29,7 @@ def index():
     )
 
 
-@bp.route("/set/<int:set_id>")
+@bp.route("/set/<string:set_id>")
 def full_set(set_id):
 
     base_path = current_app.config.get("INPUT_DIR")
@@ -47,8 +47,15 @@ def full_set(set_id):
     )
 
 
-@bp.route("/thumbnail/<int:item_id>.jpg")
-@bp.route("/thumbnail/<int:size>/<int:item_id>.jpg")
+@bp.route("/detach/<string:set_id>/<string:item_id>", methods=("POST",))
+def detach(item_id, set_id):
+    new_set =  data.remove_item_from_set(item_id, set_id)
+    
+    return full_set(set_id)
+
+
+@bp.route("/thumbnail/<string:item_id>.jpg")
+@bp.route("/thumbnail/<int:size>/<string:item_id>.jpg")
 def get_thumbnail(item_id, size=300):
     """Returns a wonderful thumbnail from the id"""
 

@@ -21,7 +21,6 @@
 <div id="sets-container">
 {% for set in sets %}
 {% include 'set.html' %}
-<hr>
 {% endfor %}
 </div>
 
@@ -99,59 +98,54 @@ function decideEmptyState() {
 decideEmptyState();
 
 
-$(function() {
-	
-	// Adds information into the delete pop-up box
-	$('#confirmDelete').on('show.bs.modal', function (event) {
-	  var id = $(event.relatedTarget).parent().find("input[name=set_id]").val()
-	  $('#delete-dialog-set-id').val(id);
-	});
-	
-	// Deals with all the buttons. Finds information in the dom, constructs the query, then posts to the API
-    $('.action-button').click(function(e) {
-    	var button = $(e.currentTarget);    	
-    	var form = button.closest('form');
-    	
-    	var set_id = form.find('input[name=set_id]').val();
-    	var name_element = form.find('input[name=name]');
-    	var name = form.find('input[name=name]').val();
-    	var action = button.attr('value');
-    	var url = "/api/set/" + action + "/" + set_id;
-    	var d = {'name': name};
-    	
-		$.post(url, d, function(result) {
-			
-			// Close the delete modal if it is open
-			$('#confirmDelete').modal('hide');
-			
-			var set_element = $('#set-'+set_id);
+// Adds information into the delete pop-up box
+$('#confirmDelete').on('show.bs.modal', function (event) {
+  var id = $(event.relatedTarget).parent().find("input[name=set_id]").val()
+  $('#delete-dialog-set-id').val(id);
+});
 
-			$('#set-'+set_id).hide('slow', function() { 
-				$('#set-'+set_id).remove(); 
-				decideEmptyState(); 
-			});
-			$('#set-'+set_id).next("hr").remove();
-			
-			statusCheck();
-			
-		}, 'json').fail(function(result) {
-			message = result.responseJSON.data.error;
-			name_element.tooltip({ 'title': message, 'trigger': 'manual'}).tooltip('show');
+// Deals with all the buttons. Finds information in the dom, constructs the query, then posts to the API
+$('.action-button').click(function(e) {
+	var button = $(e.currentTarget);    	
+	var form = button.closest('form');
+	
+	//var set_id = form.find('input[name=set_id]').val();
+	var set_id = form.closest(".set").data("set_id");
+
+	var name_element = form.find('input[name=name]');
+	var name = form.find('input[name=name]').val();
+	var action = button.attr('value');
+	var url = "/api/set/" + action + "/" + set_id;
+	var d = {'name': name};
+	
+	$.post(url, d, function(result) {
+		
+		// Close the delete modal if it is open
+		$('#confirmDelete').modal('hide');
+		
+		var set_element = $('#set-'+set_id);
+
+		$('#set-'+set_id).hide('slow', function() { 
+			$('#set-'+set_id).remove(); 
+			decideEmptyState(); 
 		});
-
-    });
-    
-    $('button').click(function(e) {
-    	var button = $(e.currentTarget);
-    	var form = button.closest('form');
-    	var name_element = form.find('input[name=name]');
-    	name_element.tooltip('hide');
-    });
+		$('#set-'+set_id).next("hr").remove();
+		
+		statusCheck();
+		
+	}, 'json').fail(function(result) {
+		message = result.responseJSON.data.error;
+		name_element.tooltip({ 'title': message, 'trigger': 'manual'}).tooltip('show');
+	});
 
 });
 
-
-
+$('button').click(function(e) {
+	var button = $(e.currentTarget);
+	var form = button.closest('form');
+	var name_element = form.find('input[name=name]');
+	name_element.tooltip('hide');
+});
 
 
 
@@ -161,7 +155,7 @@ $(function() {
 $('.more-thumbnails').on('click', function(e) {
 	e.preventDefault();
 
-    var target = $(this).closest(".pawn");
+    var target = $(this).closest(".set");
 	$.ajax({
        //url: '/set/' + $(this).data('set_id') + '?' + jQuery.param({start: start + difference, end: end + difference}),
 	   url: '/set/' + $(this).data('set_id'),
@@ -171,6 +165,24 @@ $('.more-thumbnails').on('click', function(e) {
     }
 	});
 });
+
+
+// Removes an item from a set
+//$(document).on('click', '.more-thumbnails', function(e) {
+$('.remove-from-set').on('click', function(e) {
+	e.preventDefault();
+
+    var set = $(this).closest(".set");
+	var item = $(this).closest(".item");
+	
+	$.post('/detach/' + set.data('set_id') + '/' + item.data("item_id"),
+	function(result) {
+		 item.remove();
+         set.before(result);
+		 updateThumbnails()
+    });
+});
+
 
 // Performs a status check on load
 

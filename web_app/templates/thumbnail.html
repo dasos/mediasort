@@ -1,4 +1,4 @@
-  <div class="col-lg-4 col-md-6 col-12 mb-4" id="item-{{ item.id }}">
+  <div class="item col-lg-4 col-md-6 col-12 mb-4" data-item_id="{{ item.id }}">
 	  <div class="card h-100">
 		<a href="thumbnail/1200/{{ item.id }}.jpg" target="_blank"><img src="thumbnail/{{ item.id }}.jpg" loading="lazy" class="card-img-top" /></a>
 		<div class="alert alert-warning text-center d-none" role="alert">No thumbnail available</div>
@@ -31,12 +31,14 @@
 			</div>
 		{% if set.length > 1 %}
 		<div class="float-right">
-			<form action="/remove/{{ set.id }}/{{ item.id }}" method="post" class="form-inline">
-			<button type="submit" class="btn btn-link"><i class="fas fa-unlink"></i> Remove from set</button>
+			<form class="form-inline">
+
+			<input type="hidden" name="item_id" value="{{ item.id }}">
+			<button type="button" class="btn btn-link remove-from-set"><i class="fas fa-unlink"></i> Remove from set</button>
 			</form>
     	</div>
 		{% endif %}
 		</div>
 		</div>
   </div>
-
+<hr/>
