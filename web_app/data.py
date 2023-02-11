@@ -39,8 +39,8 @@ def populate_db(force=False):
 
         for item, set in MediaFiles.load(input_dir):
 
-          save_set(set)
-          save_item(item, set)
+            save_set(set)
+            save_item(item, set)
 
         logger.info("Setting status as done.")
         redis_client.set("mediasort:status", "done")
@@ -61,51 +61,56 @@ def populate_db(force=False):
         executor.submit(load_data, current_app.config.get("INPUT_DIR"))
     return
 
+
 def save_set(set):
-  """Saves a set to redis. Will also overwrite if needed."""
+    """Saves a set to redis. Will also overwrite if needed."""
 
-  redis_client = system.get_db()
-  logger = logging.getLogger("mediasort.system.save_set")
+    redis_client = system.get_db()
+    logger = logging.getLogger("mediasort.system.save_set")
 
-  # Adds the set into a sorted set, which has the start time as the score
-  redis_client.zadd("mediasort:sets", {set.id: set.start.timestamp()})
+    # Adds the set into a sorted set, which has the start time as the score
+    redis_client.zadd("mediasort:sets", {set.id: set.start.timestamp()})
 
-  # Adds the set into a hash set. This stores a bit of information about the set, which reduces recalculation
-  redis_client.hset(
-      f"mediasort:set-meta-{set.id}",
-      mapping={
-          "length": set.length,
-          "start": int(set.start.timestamp()),
-          "end": int(set.end.timestamp()),
-          "id": set.id,
-      },
-  )
+    # Adds the set into a hash set. This stores a bit of information about the set, which reduces recalculation
+    redis_client.hset(
+        f"mediasort:set-meta-{set.id}",
+        mapping={
+            "length": set.length,
+            "start": int(set.start.timestamp()),
+            "end": int(set.end.timestamp()),
+            "id": set.id,
+        },
+    )
+
+    logger.debug(f"Saving set: {set.id}")
+
 
 def save_item(item, set):
-  """Saves an item to redis."""
+    """Saves an item to redis."""
 
-  redis_client = system.get_db()
-  logger = logging.getLogger("mediasort.system.save_item")
+    redis_client = system.get_db()
+    logger = logging.getLogger("mediasort.system.save_item")
 
-  # Adds the item into a hash set. We'll store some attributes about the item. When we want the media item back, 
-  # we set them back to what they were it
-  # It is perhaps superfluous to add the ID, but we'll pop it in for testing purposes
-  redis_client.hset(
-      f"mediasort:item-meta-{item.id}",
-      mapping={
-          "path": item.path,
-          "timestamp": item.timestamp.timestamp(),
-          "id": item.id,
-      },
-  )
+    # Adds the item into a hash set. We'll store some attributes about the item. When we want the media item back,
+    # we set them back to what they were it
+    # It is perhaps superfluous to add the ID, but we'll pop it in for testing purposes
+    redis_client.hset(
+        f"mediasort:item-meta-{item.id}",
+        mapping={
+            "path": item.path,
+            "timestamp": item.timestamp.timestamp(),
+            "id": item.id,
+        },
+    )
 
-  # Adds the item into a sorted set specific to the set. The timestamp of the item is the score
-  # We use this to find the right items to add them back in to the set
-  redis_client.zadd(
-      f"mediasort:set-items-{set.id}", {item.id: item.timestamp.timestamp()}
-  )
+    # Adds the item into a sorted set specific to the set. The timestamp of the item is the score
+    # We use this to find the right items to add them back in to the set
+    redis_client.zadd(
+        f"mediasort:set-items-{set.id}", {item.id: item.timestamp.timestamp()}
+    )
 
-  logger.debug(f"Inserting item id: {item.id} in to set: {set.id}")
+    logger.debug(f"Inserting item id: {item.id} in to set: {set.id}")
+
 
 def remove_set(set):
     """Removes all information about a set from Redis"""
@@ -118,6 +123,7 @@ def remove_set(set):
         redis_client.delete(f"mediasort:item-meta-{item_id}")
     redis_client.delete(f"mediasort:set-items-{set.id}")
 
+
 def remove_item(item, set):
     """Remove a single item. It does not update the set information, so the set will need
     to be resaved to update it."""
@@ -126,6 +132,7 @@ def remove_item(item, set):
     logger.debug(f"Removing item id: {item.id}")
     redis_client.delete(f"mediasort:item-meta-{item.id}")
     redis_client.zrem(f"mediasort:set-items-{set.id}", item.id)
+
 
 def get_item_path(item_id):
     """Returns just the path of the item, used in thumbnail creation and in recreating the item"""
@@ -187,8 +194,7 @@ def get_set(set_id, limit=0, from_end=False, store=False, no_meta=False):
     # If you don't want to do this (for performance), set no_meta to true
     if no_meta is False:
         set = set_from_meta(set_id, set)
-        
-    
+
     return set
 
 
@@ -245,37 +251,42 @@ def get_top_tail_sets(num_sets=5, max_items=10, reverse=False):
 
     sets = []
 
-    for set_id in redis_client.zrange("mediasort:sets", start=0, end=num_sets, desc=reverse):
+    for set_id in redis_client.zrange(
+        "mediasort:sets", start=0, end=num_sets, desc=reverse
+    ):
 
         # sets.append(get_set(set_id, max_items, store=True))
         sets.append(top_tail_set(set_id, max_items))
 
     return sets
 
+
 @Timer(name="remove_item_from_set", text="{name}: {:.4f} seconds")
 def remove_item_from_set(item_id, set_id):
     """Removes a specific item from a set. Returns the new set"""
-    logger = logging.getLogger("mediasort.data.remove_item_from_set")    
+    logger = logging.getLogger("mediasort.data.remove_item_from_set")
     logger.debug(f"Looking for item id: {item_id} in set id: {set_id}")
-    
+
     set = get_set(set_id, store=True)
     if set is None:
         raise Exception(f"Could not find set id: {set_id}")
-    
-    
+
     item = None
-  
+
     # Finding the item in the set
     item = set.get_item_by_id(item_id)
-    
+
     if item is None:
-      raise Exception(f"Could not find item id: {item_id} in set id: {set_id}")
-    
-    set.remove_item(item) # Remove the item from the set
-    remove_item(item, set) # Remove the old item information from Redis
-    save_set(set) # Resaves the set, since the start, length and other information may change
-    
-    new_set = MediaSet(item) # Creates a new MediaSet with the item
+        raise Exception(f"Could not find item id: {item_id} in set id: {set_id}")
+
+    set.remove_item(item)  # Remove the item from the set
+    remove_item(item, set)  # Remove the old item information from Redis
+    save_set(
+        set
+    )  # Resaves the set, since the start, length and other information may change
+
+    new_set = MediaSetStore(item)  # Creates a new MediaSet with the item
     save_set(new_set)  # Saves the new set
-    
+    save_item(item, new_set)  # Re-add the item, but this time with the new set info
+
     return new_set

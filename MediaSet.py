@@ -62,9 +62,9 @@ class MediaSet:
         return item.path in self.__items
 
     def add_item(self, item: MediaItem):
-    
+
         if self.length == 0:
-          self.start = self.end = self._start = self._end = item.timestamp
+            self.start = self.end = self._start = self._end = item.timestamp
 
         self.__items.update({item.path: item.timestamp})
         self.__adjust_boundaries(item.timestamp)
@@ -93,8 +93,8 @@ class MediaSetStore(MediaSet):
 
     def get_item_by_id(self, item_id):
         for i in self.__item_store:
-          if i.id == item_id:
-            return i
+            if i.id == item_id:
+                return i
 
     def move(
         self,

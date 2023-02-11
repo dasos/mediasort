@@ -135,6 +135,7 @@ def move_set(action, set_id):
         }
     )
 
+
 @bp.route("/suggestions")
 def suggestions():
     redis_client = system.get_db()

@@ -49,9 +49,9 @@ def full_set(set_id):
 
 @bp.route("/detach/<string:set_id>/<string:item_id>", methods=("POST",))
 def detach(item_id, set_id):
-    new_set =  data.remove_item_from_set(item_id, set_id)
-    
-    return full_set(set_id)
+    new_set = data.remove_item_from_set(item_id, set_id)
+
+    return full_set(new_set.id)
 
 
 @bp.route("/thumbnail/<string:item_id>.jpg")
