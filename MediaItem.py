@@ -120,9 +120,8 @@ class MediaItem:
             exif = self.__exifread(self.path)
 
             if not exif:
-                self.logger.warning("Falling back to exiftool")
                 exif = self.__exiftool(self.path)
-                self.logger.warning(self.path)
+                self.logger.warning(f"Falling back to exiftool for {self.path}")
 
         except FileNotFoundError:
             self.logger.warning(
