@@ -1,4 +1,4 @@
-INPUT_DIR = "images"
+INPUT_DIR = "/input"
 OUTPUT_DIR = "/output"
 DELETE_DIR = "/delete"
 SETS_SHOWN = 3
