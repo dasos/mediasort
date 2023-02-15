@@ -21,7 +21,9 @@ services:
      #- /delete:/delete
     environment:
      - 'FLASK_REDIS_URL=redis://redis:6379/0'
-     - 'FLASK_DRY_RUN=TRUE'
+     #- 'FLASK_DRY_RUN=FALSE'
+     #- 'FLASK_INPUT_DIR=/input'
+     #- 'FLASK_SUMMARY_ITEMS=/input'
 
 networks:
  mediasort:
