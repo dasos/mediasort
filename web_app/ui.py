@@ -17,7 +17,7 @@ def index():
     number_sets = current_app.config.get("SETS_SHOWN")
     base_path = current_app.config.get("INPUT_DIR")
 
-    sets = data.get_top_tail_sets(num_sets=number_sets, max_items=2)
+    sets = data.get_top_tail_sets(num_sets=number_sets, max_items=num_items)
 
     # get_location is a function that is called
     return render_template(
