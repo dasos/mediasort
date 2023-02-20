@@ -21,9 +21,8 @@ services:
      #- /delete:/delete
     environment:
      - 'FLASK_REDIS_URL=redis://redis:6379/0'
-     #- 'FLASK_DRY_RUN=FALSE'
-     #- 'FLASK_INPUT_DIR=/input'
-     #- 'FLASK_SUMMARY_ITEMS=/input'
+     - 'FLASK_DRY_RUN=TRUE'
+     # Set the dry_run flag to FALSE to actually make changes to your files
 
 networks:
  mediasort:

@@ -7,11 +7,17 @@ def create_app(config_map=None):
 
     app = Flask(__name__)
 
+    # First, pull in the environment variables called FLASK_*. This will let
+    # us know if we are in a dev environment
     app.config.from_prefixed_env()
 
-    # First try loading the defaults
-    app.config.from_pyfile("../default_config.py")
-    # Else, look for a environment variable called FLASK_
+    # Load the defaults from the appropriate file
+    if (app.config.get("DEBUG")):
+        app.config.from_pyfile("../default_config_dev.py")
+    else:
+        app.config.from_pyfile("../default_config.py")
+
+    # Pull in the env variables again, to overwrite anything here
     app.config.from_prefixed_env()
 
     # Override anything being passed in specifically

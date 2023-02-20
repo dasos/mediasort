@@ -32,8 +32,7 @@ Install the dependancies (exiftool may need some help):
 Set the variables:
 
     export FLASK_REDIS_URL="redis://<ip>:<port>/0"
-    export FLASK_ENV=development
-	export FLASK_DEBUG_LEVEL=DEBUG
+    export FLASK_DEBUG=true
 
 Execute:
 
@@ -42,6 +41,10 @@ Execute:
 or to have it listen across the network:
 
     python3 -m flask --app web_app run --host=0.0.0.0
+
+### Configuration
+
+If you run Flask in debug mode (via the --debug parameter or using the environment variable like above, then the `default_config_dev.py` file is used to set some parameters. Otherwise, `default_config.py` is used.
 
 ### How to test
 
