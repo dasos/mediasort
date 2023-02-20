@@ -60,10 +60,8 @@
 // Executed when more thumbails are loaded
 function updateThumbnails() {
 	
-	// Enable thumbnails
-	$(function () {
-	  $('[data-toggle="tooltip"]').tooltip()
-	})
+	// Enable tooltips
+	$('[data-toggle="tooltip"]').tooltip()
 	
 	// Hides broken images
 	$('img').on('error', function() {
@@ -73,6 +71,13 @@ function updateThumbnails() {
 	
 };
 updateThumbnails();
+
+
+// Hides broken images
+$('#sets-container').on('error', 'img', function() {
+      $(this).hide();
+      $(this).parent().next().removeClass("d-none");
+})
 
 // Reloads, then redirects
 $('#reload').on('click', function (event) {
@@ -107,7 +112,7 @@ $('#confirmDelete').on('show.bs.modal', function (event) {
 });
 
 // Deals with all the buttons. Finds information in the dom, constructs the query, then posts to the API
-$('.action-button').click(function(e) {
+$('#sets-container').on('click', '.action-button', function(e) {
 	var button = $(e.currentTarget);    	
 	var form = button.closest('form');
 	
@@ -143,11 +148,11 @@ $('.action-button').click(function(e) {
 
 });
 
-$('button').click(function(e) {
-	var button = $(e.currentTarget);
-	var form = button.closest('form');
-	var name_element = form.find('input[name=name]');
-	name_element.tooltip('hide');
+
+
+// Clears the tooltip on everything.
+$('#sets-container').on('click', 'button', function(e) {
+	$('input[name=name]').tooltip('hide');
 });
 
 
