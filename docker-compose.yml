@@ -21,8 +21,11 @@ services:
      #- /delete:/delete
     environment:
      - 'FLASK_REDIS_URL=redis://redis:6379/0'
-     - 'FLASK_DRY_RUN=TRUE'
-     # Set the dry_run flag to FALSE to actually make changes to your files
+     #- 'FLASK_DRY_RUN=TRUE'
+     # Uncomment the file above to actually make changes to your files
+     #- 'FLUSH=TRUE'
+     # Uncomment the file above make the refreshing of the DB much faster. Don't do it if you share the DB with anything.
+
 
 networks:
  mediasort:

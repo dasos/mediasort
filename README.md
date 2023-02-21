@@ -10,6 +10,9 @@ The easiest way is to take the Docker Compose file, modify some of the config, a
 
 It will then be available at port 8000 by default. If you are running it on your local machine, it is http://localhost:8000
 
+### Configuration
+See some configuration options in `default_config.py`. Override them with the `FLASK_` prefix. 
+
 ## Development, or local install
 
 ### Dependancies
@@ -63,3 +66,4 @@ Auto-formatting is achieved using Black:
 And making sure you follow PEP 8 is done with Flake8, with the adjustments that Black recommend.
 
     python3 -m flake8
+
