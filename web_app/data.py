@@ -23,11 +23,16 @@ def clear_db():
 
     redis_client = system.get_db()
 
-    # Save the suggestions
+    # Save some stuff
     suggestions = []
+    locations = {}
 
     if current_app.config.get("KEEP_SUGGESTIONS"):
         suggestions = list(redis_client.smembers("mediasort:suggestions"))
+    if current_app.config.get("KEEP_LOCATIONS"):
+        location_keys = redis_client.scan_iter(match="mediasort:coord-*")
+        for key in location_keys:
+          locations[key] = redis_client.get(key)
 
     if current_app.config.get("FLUSH"):
         logger.warning("Flushing DB")
@@ -37,9 +42,9 @@ def clear_db():
         for name in redis_client.scan_iter(match="mediasort:*"):
             redis_client.delete(name)
 
-    # Save the suggestions back
+    # Put it back
     [redis_client.sadd("mediasort:suggestions", s) for s in suggestions]
-
+    [redis_client.set(key, value) for key, value in locations.items()]
 
 def populate_db(force=False):
 

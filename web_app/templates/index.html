@@ -112,7 +112,7 @@ $('#confirmDelete').on('show.bs.modal', function (event) {
 });
 
 // Deals with all the buttons. Finds information in the dom, constructs the query, then posts to the API
-$('#sets-container').on('click', '.action-button', function(e) {
+$('#sets-container,#confirmDelete').on('click', '.action-button', function(e) {
 	var button = $(e.currentTarget);    	
 	var form = button.closest('form');
 	
