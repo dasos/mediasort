@@ -12,7 +12,7 @@ def create_app(config_map=None):
     app.config.from_prefixed_env()
 
     # Load the defaults from the appropriate file
-    if (app.config.get("DEBUG")):
+    if app.config.get("DEBUG"):
         app.config.from_pyfile("../default_config_dev.py")
     else:
         app.config.from_pyfile("../default_config.py")

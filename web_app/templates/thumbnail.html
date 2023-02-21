@@ -6,21 +6,21 @@
 		<div class="card-body">
 			<div class="striped">
 				<div class="row py-2">
-					<div class="col-5 font-weight-bold">Filename</div>
-					<div class="col text-right text-truncate">{{ item.orig_filename }}</div>
+					<div class="col-5 px-2 font-weight-bold">Filename</div>
+					<div class="col px-2 text-right text-truncate">{{ item.orig_filename }}</div>
 				</div>
 				{% if item.orig_directory is not equalto base_path %}
 				<div class="row py-2">
-					<div class="col-5 font-weight-bold">Directory</div>
-					<div class="col text-right text-truncate" data-toggle="tooltip" title="{{ item.orig_directory }}">{{ item.orig_directory | replace(base_path, "") }}</div>
+					<div class="col-5 px-2 font-weight-bold">Directory</div>
+					<div class="col px-2 text-right text-truncate" data-toggle="tooltip" title="{{ item.orig_directory }}">{{ item.orig_directory | replace(base_path, "") }}</div>
 				</div>
 				{% endif %}
 				{% set coords = item.get_coords() %}
 				{% set location = get_location(coords) %}
 				{% if location %}
 				<div class="row py-2">
-					<div class="col-5 font-weight-bold">Location</div>
-					<div class="col text-right text-truncate" data-toggle="tooltip" title="{{ location }}">
+					<div class="col-5 px-2 font-weight-bold">Location</div>
+					<div class="col px-2 text-right text-truncate" data-toggle="tooltip" title="{{ location }}">
 					<a href="https://www.openstreetmap.org/?mlat={{ coords[0] }}&mlon={{ coords[1] }}#map=18/{{ coords[0] }}/{{ coords[1] }}" target="_BLANK">
 					{{ location }}
 					</a>

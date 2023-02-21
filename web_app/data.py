@@ -22,21 +22,21 @@ def clear_db():
     logger.warning(message)
 
     redis_client = system.get_db()
-    
+
     # Save the suggestions
     suggestions = []
-    
-    if (current_app.config.get("KEEP_SUGGESTIONS")):
+
+    if current_app.config.get("KEEP_SUGGESTIONS"):
         suggestions = list(redis_client.smembers("mediasort:suggestions"))
-    
-    if (current_app.config.get("FLUSH")):
+
+    if current_app.config.get("FLUSH"):
         logger.warning("Flushing DB")
         redis_client.flushdb()
     else:
         logger.warning("Deleting from DB")
         for name in redis_client.scan_iter(match="mediasort:*"):
             redis_client.delete(name)
-            
+
     # Save the suggestions back
     [redis_client.sadd("mediasort:suggestions", s) for s in suggestions]
 

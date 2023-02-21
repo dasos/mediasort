@@ -127,6 +127,9 @@ $('#sets-container').on('click', '.action-button', function(e) {
 	
 	$.post(url, d, function(result) {
 		
+		// Adds the name to the suggestions engine
+		names.add([name]);
+		
 		// Close the delete modal if it is open
 		$('#confirmDelete').modal('hide');
 		

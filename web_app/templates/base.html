@@ -23,7 +23,7 @@
     <title>{% block title %} {% endblock %}</title>
   </head>
   <body>
-	<div class="container">
+	<div class="container col-lg-10">
 	    {% for category, message in get_flashed_messages(with_categories=true) %}
 	        <div class="alert {% if category != "message" %} alert-{{ category }} {% else %} alert-info {% endif %}">{{ message }}</div>
 	    {% endfor %}
