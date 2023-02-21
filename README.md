@@ -1,17 +1,19 @@
+
 # mediasort
 
 MediaSort is a Python3 web UI that helps you sort media items into folders. The classic use case is to take the many photos and videos produced by a smartphone, and makes sense of them. It also works well for a DSLR.
 
 ## What does it do?
-<img src="screenshot.png" width="200"/>
+<img src="screenshot.png" width="600"/>
+
 The workflow is like this, assuming you keep the defaults:
-* Scan the files. It will automatically places each file into a set. A set is a group of photos, seperated by 3 hours. This means that photos taken relatively close together will be in the same set.
-* Each set is displayed in the UI. Each item has a location (pulled from the EXIF of the photo, and geolocated), plus the date and time.  You then decided what to do with the set.
-* You can save it with date. This will create a directory in the output folder called yyyy/yyyy-mm/yyyy-mm-ddd <name>. It'll then move all the files in the set there.
-* You can save it without date. This will create a directory in the output folder called <name>. It'll then move all the files in the set there.
-* You can delete. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
-* Additionally, for each item in a set, you can *Remove from set*. This will detach it, and create a new set. This is useful if you want to split some sets up.
-* When you give a set a name, the name is cached. This powers the typeahead.
+ - Scan the files. It will automatically places each file into a set. A set is a group of photos, seperated by 3 hours. This means that photos taken relatively close together will be in the same set.
+- Each set is displayed in the UI. Each item has a location (pulled from the EXIF of the photo, and geolocated), plus the date and time.  You then decided what to do with the set.
+- You can save it with date. This will create a directory in the output folder called `yyyy/yyyy-mm/yyyy-mm-ddd <name>`. It'll then move all the files in the set there.
+- You can save it without date. This will create a directory in the output folder called `<name>`. It'll then move all the files in the set there.
+- You can delete. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
+- Additionally, for each item in a set, you can *Remove from set*. This will detach it, and create a new set. This is useful if you want to split some sets up.
+- When you give a set a name, the name is cached. This powers the typeahead. 
 Note that using the same name multiple times is super common. It will effectively merge a set, assuming they have the same date.
 
 ## Get it running
