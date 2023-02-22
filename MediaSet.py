@@ -3,6 +3,7 @@ import datetime
 import os
 import re
 import random
+import logging
 
 
 class MediaSet:
@@ -10,6 +11,7 @@ class MediaSet:
     If no item is passed in, an empty one will be made, but it means there are no start, end and things could break"""
 
     def __init__(self, item: MediaItem = None, gap=2):
+        self.logger = logging.getLogger("mediasort.MediaSet")
         self.gap = gap
         self.id = id(self)
         self.length = 0
@@ -79,6 +81,7 @@ class MediaSetStore(MediaSet):
     def __init__(self, item: MediaItem = None, gap=2):
         self.__item_store = []
         super().__init__(item, gap)
+        self.logger = logging.getLogger("mediasort.MediaSetStore")
 
     def add_item(self, item: MediaItem):
         super().add_item(item)
@@ -115,6 +118,10 @@ class MediaSetStore(MediaSet):
 
         if not dry_run:
             os.makedirs(directory, exist_ok=True)
+        else:
+            self.logger.info(
+                "Moving files in dry_run mode! No changes will occur to the file system."
+            )
 
         [item.move(directory, dry_run) for item in self.__item_store]
 

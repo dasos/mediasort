@@ -14,6 +14,7 @@ The workflow is like this, assuming you keep the defaults:
 - You can delete. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
 - Additionally, for each item in a set, you can *Remove from set*. This will detach it, and create a new set. This is useful if you want to split some sets up.
 - When you give a set a name, the name is cached. This powers the typeahead. 
+
 Note that using the same name multiple times is super common. It will effectively merge a set, assuming they have the same date.
 
 ## Get it running

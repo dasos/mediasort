@@ -76,7 +76,10 @@ def move_set(action, set_id):
 
     # The function that is executed in a thread
     def actually_move(set, name, testing=False):
-        testing = True
+        if testing:
+            dry_run = True
+        else:
+            dry_run = current_app.config.get("DRY_RUN")
 
         def remove_from_db():
             # Perhaps optimistically, remove the information *before* it is actioned. We don't want to interact with it again. If it goes wrong, it can be rescanned
@@ -88,9 +91,9 @@ def move_set(action, set_id):
             dir = current_app.config.get("OUTPUT_DIR")
             remove_from_db()
             if action == "save_date":
-                set.move(dir, dry_run=testing)
+                set.move(dir, dry_run=dry_run)
             else:
-                set.move(dir, use_date_directory=False, dry_run=testing)
+                set.move(dir, use_date_directory=False, dry_run=dry_run)
 
             logger.info(f"Moved set: {set}")
 
@@ -99,7 +102,7 @@ def move_set(action, set_id):
             dir = current_app.config.get("DELETE_DIR")
             remove_from_db()
             set.move(
-                dir, use_date_directory=False, use_name_directory=False, dry_run=testing
+                dir, use_date_directory=False, use_name_directory=False, dry_run=dry_run
             )
 
             logger.info("Moved set to delete directory")
