@@ -167,11 +167,14 @@ $('.more-thumbnails').on('click', function(e) {
 	e.preventDefault();
 
     var target = $(this).closest(".set");
+    var name = target.find('input[name=name]').val();
 	$.ajax({
        //url: '/set/' + $(this).data('set_id') + '?' + jQuery.param({start: start + difference, end: end + difference}),
 	   url: '/set/' + $(this).data('set_id'),
        success: function(result) {
          target.replaceWith(result);
+         target.find('input[name=name]').val(name);
+         console.log(target.find('input[name=name]').val())
 		 updateThumbnails()
     }
 	});

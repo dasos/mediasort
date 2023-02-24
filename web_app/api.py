@@ -75,7 +75,8 @@ def move_set(action, set_id):
     redis_client = system.get_db()
 
     # The function that is executed in a thread
-    def actually_move(set, name, testing=False):
+    def actually_move(set_id, name, testing=False):
+        set = data.get_set(set_id, store=True)
         if testing:
             dry_run = True
         else:
@@ -110,7 +111,8 @@ def move_set(action, set_id):
         else:
             logger.error("No command")
 
-    set = data.get_set(set_id, store=True)
+    # Check that the set exists
+    set = data.set_from_meta(set_id)
     if set is None:
         logger.warning(f"Could not find set id: {set_id}")
         return jsonify(data={"error": "Could not find set"}), 500
@@ -126,11 +128,11 @@ def move_set(action, set_id):
             return jsonify(data={"error": "You must provide a name to save"}), 400
 
     if current_app.testing:
-        actually_move(set, name, True)
+        actually_move(set_id, name, True)
     else:
         logger.info("Starting new thread for load")
         executor = Executor(current_app)
-        executor.submit(actually_move, set, name)
+        executor.submit(actually_move, set_id, name)
 
     return jsonify(
         data={
