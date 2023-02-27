@@ -10,10 +10,13 @@ def test_index(client_data):
     response = client_data.get("/")
 
     assert b"forest.jpg" in response.data
-    assert b"leaf.jpg" in response.data
     assert b"save" in response.data
     assert b"2022-01-01" in response.data
 
+def test_more_sets(client_data):
+    response = client_data.get("/set/more_from/2")
+
+    assert b"leaf.jpg" in response.data
 
 def test_thumbnail(client_tuple_data):
 

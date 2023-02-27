@@ -77,6 +77,7 @@ def move_set(action, set_id):
     # The function that is executed in a thread
     def actually_move(set_id, name, testing=False):
         set = data.get_set(set_id, store=True)
+        logger.debug(f"Moving set: {set}")
         if testing:
             dry_run = True
         else:
@@ -117,7 +118,6 @@ def move_set(action, set_id):
         logger.warning(f"Could not find set id: {set_id}")
         return jsonify(data={"error": "Could not find set"}), 500
 
-    logger.debug(f"Moving set: {set}")
     name = str(request.form.get("name"))
 
     if "save" in action:
