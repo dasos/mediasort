@@ -9,7 +9,7 @@ from web_app import data, system
 
 bp = Blueprint("ui", __name__, url_prefix="/")
 
-
+# TODO: repetitive code here
 @bp.route("/")
 def index():
 
@@ -23,11 +23,26 @@ def index():
     return render_template(
         "index.html",
         sets=sets,
-        limit=num_items,
         base_path=base_path,
         get_location=system.get_location,
     )
 
+@bp.route("/set/more_from/<int:position>")
+def more_sets(position):
+
+    num_items = current_app.config.get("SUMMARY_ITEMS")
+    number_sets = current_app.config.get("SETS_SHOWN")
+    base_path = current_app.config.get("INPUT_DIR")
+
+    sets = data.get_top_tail_sets(skip=position, num_sets=number_sets, max_items=num_items)
+
+    # get_location is a function that is called
+    return [render_template(
+        "set.html",
+        set=set,
+        base_path=base_path,
+        get_location=system.get_location,
+    ) for set in sets]
 
 @bp.route("/set/<string:set_id>")
 def full_set(set_id):

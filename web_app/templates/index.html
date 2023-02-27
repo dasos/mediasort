@@ -222,6 +222,33 @@ statusCheck();
 
 
 
+
+
+var currentscrollHeight = 0;
+
+$(window).on("scroll", function () {
+    const scrollHeight = $(document).height();
+    const scrollPos = Math.floor($(window).height() + $(window).scrollTop());
+    const isBottom = scrollHeight - 100 < scrollPos;
+
+    if (isBottom && currentscrollHeight < scrollHeight) {
+		var counter = $('.set').length - 1; // Reducing by one to miss out the fake set in the modal
+	    $.ajax({
+		    url: "set/more_from/" + counter,
+		
+	        success: function (result) {
+	        	//console.log(result)
+	        	$('#sets-container').append(result)
+	        }
+	    });
+        currentscrollHeight = scrollHeight;
+    }
+});
+
+
+
+
+
 <!-- The typeahead stuff -->
 
 var names = new Bloodhound({

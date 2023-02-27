@@ -263,14 +263,20 @@ def set_from_meta(set_id, s=MediaSet()):
 
 
 @Timer(name="get_top_tail_sets", text="{name}: {:.4f} seconds")
-def get_top_tail_sets(num_sets=5, max_items=10, reverse=False):
-    """Gets some sets that contain some items in a "top and tail" fashion"""
+def get_top_tail_sets(skip=0, num_sets=5, max_items=10, reverse=False):
+    """
+    Gets some sets that contain some items in a "top and tail" fashion
+    skip -- the start point. How many sets to skip.
+    num_sets -- how many sets to get at a time
+    max_items -- how many items in each set should there be
+    reverse -- do things backwards (ie, z-a)
+    """
     redis_client = system.get_db()
 
     sets = []
 
     for set_id in redis_client.zrange(
-        "mediasort:sets", start=0, end=num_sets, desc=reverse
+        "mediasort:sets", start=skip, end=num_sets + skip - 1, desc=reverse
     ):
 
         # sets.append(get_set(set_id, max_items, store=True))
