@@ -9,7 +9,7 @@ flask-executor
 requests
 codetiming
 pytest
-fakeredis
+fakeredis>=2.9.0
 pytest-cov
 flake8
 black

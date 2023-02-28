@@ -14,7 +14,7 @@ def test_index(client_data):
     assert b"2022-01-01" in response.data
 
 def test_more_sets(client_data):
-    response = client_data.get("/set/more_from/2")
+    response = client_data.get("/set/more_from/1641031200")
 
     assert b"leaf.jpg" in response.data
 

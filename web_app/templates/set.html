@@ -1,4 +1,4 @@
-<div class="set card bg-light pb-2" data-set_id="{{ set.id }}">
+<div class="set card bg-light pb-2" data-set_id="{{ set.id }}" data-start_timestamp="{{ set.start.timestamp() | int }}">
     <div class="container mt-2">
       <div class="row">
         <div class="col-8"><h4>{{ set.start.strftime("%A %-d %B %Y at %H:%M") }}{% if set.start != set.end %} - {{ set.end.strftime("%H:%M") }}{% endif %}</h4>

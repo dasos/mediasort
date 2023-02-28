@@ -263,10 +263,10 @@ def set_from_meta(set_id, s=MediaSet()):
 
 
 @Timer(name="get_top_tail_sets", text="{name}: {:.4f} seconds")
-def get_top_tail_sets(skip=0, num_sets=5, max_items=10, reverse=False):
+def get_top_tail_sets(start=0, num_sets=5, max_items=10, reverse=False):
     """
     Gets some sets that contain some items in a "top and tail" fashion
-    skip -- the start point. How many sets to skip.
+    start -- the start point. 
     num_sets -- how many sets to get at a time
     max_items -- how many items in each set should there be
     reverse -- do things backwards (ie, z-a)
@@ -274,11 +274,20 @@ def get_top_tail_sets(skip=0, num_sets=5, max_items=10, reverse=False):
     redis_client = system.get_db()
 
     sets = []
+    
+    end = 10**100 # -1 doesn't seem to work. This workaround is nasty. TODO.
+    
+    # Otherwise the first one is the same
+    if start > 0:
+        offset = 1
+    else:
+        offset = 0
 
     for set_id in redis_client.zrange(
-        "mediasort:sets", start=skip, end=num_sets + skip - 1, desc=reverse
+        #"mediasort:sets", start=skip, end=num_sets + skip - 1, desc=reverse, withscores=True
+        "mediasort:sets", start, end, offset=offset, num=num_sets, desc=reverse, byscore=True#, withscores=True
     ):
-
+        
         # sets.append(get_set(set_id, max_items, store=True))
         sets.append(top_tail_set(set_id, max_items))
 

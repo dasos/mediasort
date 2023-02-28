@@ -224,24 +224,30 @@ statusCheck();
 
 
 
-var currentscrollHeight = 0;
+var loadingSets = false;
 
 $(window).on("scroll", function () {
     const scrollHeight = $(document).height();
     const scrollPos = Math.floor($(window).height() + $(window).scrollTop());
     const isBottom = scrollHeight - 100 < scrollPos;
+    
+    //console.log(isBottom, currentscrollHeight, scrollHeight)
 
-    if (isBottom && currentscrollHeight < scrollHeight) {
-		var counter = $('.set').length - 1; // Reducing by one to miss out the fake set in the modal
+    //if (isBottom && currentscrollHeight < scrollHeight) {
+    if (isBottom && !loadingSets) {
+    	loadingSets = true;
+		//var counter = $('.set').length - 1; // Reducing by one to miss out the fake set in the modal
+		var last_id = $('.set').not("#fake-set").last().data('start_timestamp');
 	    $.ajax({
-		    url: "set/more_from/" + counter,
+		    url: "set/more_from/" + last_id,
 		
 	        success: function (result) {
 	        	//console.log(result)
-	        	$('#sets-container').append(result)
+	        	$('#sets-container').append(result);
+	        	loadingSets = false;
 	        }
 	    });
-        currentscrollHeight = scrollHeight;
+        //currentscrollHeight = scrollHeight;
     }
 });
 

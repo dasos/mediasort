@@ -34,7 +34,7 @@ def more_sets(position):
     number_sets = current_app.config.get("SETS_SHOWN")
     base_path = current_app.config.get("INPUT_DIR")
 
-    sets = data.get_top_tail_sets(skip=position, num_sets=number_sets, max_items=num_items)
+    sets = data.get_top_tail_sets(start=position, num_sets=number_sets, max_items=num_items)
 
     # get_location is a function that is called
     return [render_template(
