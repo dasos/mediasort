@@ -183,7 +183,7 @@ $('.more-thumbnails').on('click', function(e) {
 
 // Removes an item from a set
 //$(document).on('click', '.more-thumbnails', function(e) {
-$('.remove-from-set').on('click', function(e) {
+$('#sets-container').on('click', '.remove-from-set', function(e) {
 	e.preventDefault();
 
     var set = $(this).closest(".set");
