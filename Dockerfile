@@ -19,4 +19,4 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8080
 
-ENTRYPOINT gunicorn 'web_app:create_app()' --bind 0.0.0.0:8080 --workers=2
+ENTRYPOINT gunicorn 'web_app:create_app()' --bind 0.0.0.0:8080 --workers=5
