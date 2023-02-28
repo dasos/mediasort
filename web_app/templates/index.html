@@ -162,8 +162,7 @@ $('#sets-container').on('click', 'button', function(e) {
 
 
 // Gets more more thumbnails on click
-//$(document).on('click', '.more-thumbnails', function(e) {
-$('.more-thumbnails').on('click', function(e) {
+$('#sets-container').on('click', '.more-thumbnails', function(e) {
 	e.preventDefault();
 
     var target = $(this).closest(".set");
@@ -182,7 +181,6 @@ $('.more-thumbnails').on('click', function(e) {
 
 
 // Removes an item from a set
-//$(document).on('click', '.more-thumbnails', function(e) {
 $('#sets-container').on('click', '.remove-from-set', function(e) {
 	e.preventDefault();
 
@@ -191,8 +189,9 @@ $('#sets-container').on('click', '.remove-from-set', function(e) {
 	
 	$.post('/detach/' + set.data('set_id') + '/' + item.data("item_id"),
 	function(result) {
+		 //item.hide('slow', function(){ item.remove(); });
 		 item.remove();
-         set.before(result);
+         set.before(result);//.hide() //.show('slow');
 		 updateThumbnails()
     });
 });
