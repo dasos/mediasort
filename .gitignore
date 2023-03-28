@@ -6,3 +6,4 @@ more/
 .coverage
 htmlcov
 .DS_Store
+venv
