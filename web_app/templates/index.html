@@ -57,27 +57,43 @@
 
 <script type="text/javascript">
 
-// Executed when more thumbails are loaded
-function updateThumbnails() {
+<!-- The typeahead stuff -->
+
+var names = new Bloodhound({
+  datumTokenizer: Bloodhound.tokenizers.whitespace,
+  queryTokenizer: Bloodhound.tokenizers.whitespace,
+  prefetch: {
+  	cache: false,
+  	url: "api/suggestions"
+  }
+});
+
+// Called when a set is added or changed
+function setEvents() {
 	
 	// Enable tooltips
-	$('[data-toggle="tooltip"]').tooltip()
+	$('[data-toggle="tooltip"]').tooltip();
 	
 	// Hides broken images
 	$('img').on('error', function() {
 	      $(this).hide();
 	      $(this).parent().next().removeClass("d-none");
-	})
+	});
+	
+	// Typeahead :)
+	$('[name=name].typeahead:not(.tt-input)').typeahead({
+	  hint: true,
+	  highlight: true,
+	  minLength: 0
+	},
+	{
+	  name: 'name',
+	  source: names
+	});
 	
 };
-updateThumbnails();
+setEvents();
 
-
-// Hides broken images
-$('#sets-container').on('error', 'img', function() {
-      $(this).hide();
-      $(this).parent().next().removeClass("d-none");
-})
 
 // Reloads, then redirects
 $('#reload').on('click', function (event) {
@@ -153,7 +169,7 @@ $('#sets-container,#confirmDelete').on('click', '.action-button', function(e) {
 
 
 
-// Clears the tooltip on everything.
+// Clears the tooltip when you click a button
 $('#sets-container').on('click', 'button', function(e) {
 	$('input[name=name]').tooltip('hide');
 });
@@ -174,7 +190,7 @@ $('#sets-container').on('click', '.more-thumbnails', function(e) {
          target.replaceWith(result);
          target.find('input[name=name]').val(name);
          console.log(target.find('input[name=name]').val())
-		 updateThumbnails()
+		 setEvents()
     }
 	});
 });
@@ -192,7 +208,7 @@ $('#sets-container').on('click', '.remove-from-set', function(e) {
 		 //item.hide('slow', function(){ item.remove(); });
 		 item.remove();
          set.before(result);//.hide() //.show('slow');
-		 updateThumbnails()
+		 setEvents();
     });
 });
 
@@ -243,36 +259,12 @@ $(window).on("scroll", function () {
 	        success: function (result) {
 	        	//console.log(result)
 	        	$('#sets-container').append(result);
+				setEvents();
 	        	loadingSets = false;
 	        }
 	    });
         //currentscrollHeight = scrollHeight;
     }
-});
-
-
-
-
-
-<!-- The typeahead stuff -->
-
-var names = new Bloodhound({
-  datumTokenizer: Bloodhound.tokenizers.whitespace,
-  queryTokenizer: Bloodhound.tokenizers.whitespace,
-  prefetch: {
-  	cache: false,
-  	url: "api/suggestions"
-  }
-});
-
-$('.typeahead').typeahead({
-  hint: true,
-  highlight: true,
-  minLength: 0
-},
-{
-  name: 'name',
-  source: names
 });
 
 
