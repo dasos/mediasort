@@ -179,14 +179,15 @@ $('#sets-container').on('click', 'button', function(e) {
 
 // Gets more more thumbnails on click
 $('#sets-container').on('click', '.more-thumbnails', function(e) {
-	e.preventDefault();
-
+	e.preventDefault(); 
     var target = $(this).closest(".set");
     var name = target.find('input[name=name]').val();
+	$(this).replaceWith('<i class="fas fa-spinner fa-spin"></i>');
 	$.ajax({
        //url: '/set/' + $(this).data('set_id') + '?' + jQuery.param({start: start + difference, end: end + difference}),
 	   url: '/set/' + $(this).data('set_id'),
        success: function(result) {
+	   	 target.next("hr").remove();
          target.replaceWith(result);
          target.find('input[name=name]').val(name);
          console.log(target.find('input[name=name]').val())
