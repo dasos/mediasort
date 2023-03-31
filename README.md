@@ -7,16 +7,14 @@ MediaSort is a Python3 web UI that helps you sort media items into folders. The 
 <img src="screenshot.png" width="600"/>
 
 The workflow is like this, assuming you keep the defaults:
-- Scan the files. It will automatically places each file into a set. A set is a group of photos, seperated by 3 hours. This means that photos taken relatively close together will be in the same set.
-- Each set is displayed in the UI. Each item has a location (pulled from the EXIF of the photo, and geolocated), plus the date and time.  You then decided what to do with the set.
-  - You can save it with date. This will create a directory in the output folder called `yyyy/yyyy-mm/yyyy-mm-ddd <name>`. It'll then move all the files in the set there.
-  - You can save it without date. This will create a directory in the output folder called `<name>`. It'll then move all the files in the set there.
-  - You can delete. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
-  - Additionally, for each item in a set, you can *Remove from set*. This will detach it, and create a new set. This is useful if you want to split some sets up.
-- When you give a set a name, the name is cached. This powers the typeahead. 
-- And as you scrolling, more sets are loaded.
-
-Note that using the same name multiple times is super common. It will effectively merge a set, assuming they have the same date.
+- First, all the files in the input directory are scanned. Each file will be automatically placed into a set. A set is a group of photos, seperated by 3 hours. This means that photos taken relatively close together (in terms of time) will be in the same set. The time is taken from the EXIF of the photo. If there isn't any EXIF, the file is ignored.
+- This is then shown in the UI. Six items in each set are shown (the first three and the last three), with each item showing a location (pulled from the EXIF of the photo, and geolocated), plus the date and time.  You can then decide what to do with the set.
+  - You can **save with date**. This will create a directory in the output folder called `yyyy/yyyy-mm/yyyy-mm-ddd <name>`. It'll then move all the files in the set there.
+  - You can **save without date**. This will create a directory in the output folder called `<name>`. It'll then move all the files in the set there.
+  - You can **delet**e. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
+  - Additionally, for each item in a set, you can **remove from set**. This will detach it, and create a new set. This is useful if you want to split some sets up.
+- When you save a set with a name, the name is cached. This powers the typeahead, and lets you select the same name again. Note that using the same name multiple times is super common. It will effectively merge a set, assuming they have the same date.
+- And as you scrolling, more sets are loaded. If you want to load more photos for a set than the six, you can.
 
 ## Get it running
 ### Docker
