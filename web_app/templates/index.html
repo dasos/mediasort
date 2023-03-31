@@ -154,7 +154,7 @@ $('#sets-container,#confirmDelete').on('click', '.action-button', function(e) {
 
 		set_element.hide('slow', function() { 
 			set_element.remove(); 
-			decideEmptyState(); 
+			loadMore(); // Loads more if we are at the bottom
 		});
 		set_element.next("hr").remove();
 		
@@ -242,7 +242,9 @@ statusCheck();
 
 var loadingSets = false;
 
-$(window).on("scroll", function () {
+$(window).on("scroll", loadMore());
+
+function loadMore() {
     const scrollHeight = $(document).height();
     const scrollPos = Math.floor($(window).height() + $(window).scrollTop());
     const isBottom = scrollHeight - 100 < scrollPos;
@@ -254,6 +256,7 @@ $(window).on("scroll", function () {
     	loadingSets = true;
 		//var counter = $('.set').length - 1; // Reducing by one to miss out the fake set in the modal
 		var last_id = $('.set').not("#fake-set").last().data('start_timestamp');
+		if (!last_id) last_id = 0;
 	    $.ajax({
 		    url: "set/more_from/" + last_id,
 		
@@ -261,12 +264,17 @@ $(window).on("scroll", function () {
 	        	//console.log(result)
 	        	$('#sets-container').append(result);
 				setEvents();
+
 	        	loadingSets = false;
-	        }
+	        },
+			
+			complete: function () {
+				decideEmptyState();
+			},
 	    });
         //currentscrollHeight = scrollHeight;
     }
-});
+	}
 
 
 </script>
