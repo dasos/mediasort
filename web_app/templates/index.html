@@ -242,7 +242,7 @@ statusCheck();
 
 var loadingSets = false;
 
-$(window).on("scroll", loadMore());
+$(window).on("scroll", loadMore);
 
 function loadMore() {
     const scrollHeight = $(document).height();
@@ -252,6 +252,7 @@ function loadMore() {
     //console.log(isBottom, currentscrollHeight, scrollHeight)
 
     //if (isBottom && currentscrollHeight < scrollHeight) {
+    console.log((isBottom && !loadingSets))
     if (isBottom && !loadingSets) {
     	loadingSets = true;
 		//var counter = $('.set').length - 1; // Reducing by one to miss out the fake set in the modal
@@ -274,7 +275,7 @@ function loadMore() {
 	    });
         //currentscrollHeight = scrollHeight;
     }
-	}
+}
 
 
 </script>
