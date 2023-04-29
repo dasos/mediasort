@@ -31,18 +31,20 @@ def get_db():
 
 def make_thumbnail(filename, wh=300):
 
+    l = logging.getLogger("mediasort.system.make_thumbnail")
+
     try:
         return make_thumbnail_pil(filename, wh)
     except UnidentifiedImageError:
         
       try:
+        l.warning("Falling to ffmpeg for filename")
         return make_thumbnail_ffmpeg(filename, wh)
       except Exception as e:
 
-        l = logging.getLogger("mediasort.system.make_thumbnail")
         l.info("Could not generate thumbnail")
         l.debug(e)
-        return ""
+        return "", ""
 
 def make_thumbnail_ffmpeg(filename, wh):
   ffmpeg = (
