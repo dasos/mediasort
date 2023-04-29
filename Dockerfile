@@ -6,6 +6,9 @@ RUN apt-get update -qq \
     && apt-get -qq autoremove \
     && apt-get -qq clean
 
+COPY --from=mwader/static-ffmpeg:6.0 /ffmpeg /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:6.0 /ffprobe /usr/local/bin/
+
 WORKDIR /usr/src/mediasort
 
 COPY requirements.txt ./

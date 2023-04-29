@@ -47,6 +47,7 @@ def make_thumbnail(filename, wh=300):
         return "", ""
 
 def make_thumbnail_ffmpeg(filename, wh):
+  static_ffmpeg.add_paths(True) # If ffmpeg doesn't exist, get a version
   ffmpeg = (
       FFmpeg(executable='static_ffmpeg')
       .input(filename)
