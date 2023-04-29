@@ -69,16 +69,16 @@ def detach(item_id, set_id):
     return full_set(new_set.id)
 
 
-@bp.route("/thumbnail/<string:item_id>.jpg")
-@bp.route("/thumbnail/<int:size>/<string:item_id>.jpg")
+@bp.route("/thumbnail/<string:item_id>")
+@bp.route("/thumbnail/<int:size>/<string:item_id>")
 def get_thumbnail(item_id, size=300):
     """Returns a wonderful thumbnail from the id"""
 
     path = data.get_item_path(item_id)
 
     # item = set.set[photo_id]
-    thumbnail = system.make_thumbnail(path, size)
+    thumbnail, content_type = system.make_thumbnail(path, size)
 
     response = make_response(thumbnail)
-    response.content_type = "image/jpeg"
+    response.content_type = content_type
     return response

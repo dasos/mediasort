@@ -2,9 +2,10 @@ import logging
 from flask import current_app, g
 from flask_redis import FlaskRedis
 import requests
-from PIL import UnidentifiedImageError, Image
+from PIL import UnidentifiedImageError, Image, ImageOps
 from io import BytesIO
-
+import static_ffmpeg
+from ffmpeg import FFmpeg
 
 def get_db():
 
@@ -33,19 +34,44 @@ def make_thumbnail(filename, wh=300):
     try:
         return make_thumbnail_pil(filename, wh)
     except UnidentifiedImageError:
-        logging.getLogger("mediasort.system.make_thumbnail").info(
-            "Could not generate thumbnail"
-        )
+        
+      try:
+        return make_thumbnail_ffmpeg(filename, wh)
+      except Exception as e:
+
+        l = logging.getLogger("mediasort.system.make_thumbnail")
+        l.info("Could not generate thumbnail")
+        l.debug(e)
         return ""
 
+def make_thumbnail_ffmpeg(filename, wh):
+  ffmpeg = (
+      FFmpeg(executable='static_ffmpeg')
+      .input(filename)
+      .output(
+          "pipe:1",
+          r=2, # frames per sec
+          t=10, # max length
+          f="webp",
+          vf=f"scale={wh}:-2",
+      )
+  )
+
+  return ffmpeg.execute(), "image/webp"
+  
 
 def make_thumbnail_pil(filename, wh):
     size = (wh, wh)
     buffered = BytesIO()
+    
     im = Image.open(filename)
-    im.thumbnail(size)
+    if (wh > 500): # A poor rule of thumb
+      im.thumbnail(size) # Keeps aspect ratio, with no crops
+    else:
+      im = ImageOps.fit(im, size) # Crops, will be square
+    
     im.save(buffered, format="JPEG")
-    return buffered.getvalue()
+    return buffered.getvalue(), "image/jpeg"
 
 
 def get_location(coords):
@@ -101,15 +127,3 @@ def request_location(coords):
         return result["city"]
 
     return result
-
-
-# def make_thumbnail_cv2(filename, wh):
-#  import cv2
-#  video = cv2.VideoCapture(filename)
-#  status, image = video.read()
-#
-#  width = wh
-#  height = int(width * image.shape[0] / image.shape[1])
-#  im = cv2.resize(image, (width, height), interpolation = cv2.INTER_AREA)
-#  is_success, im_buf_arr = cv2.imencode(".jpg", im)
-#  return im_buf_arr.tobytes()
