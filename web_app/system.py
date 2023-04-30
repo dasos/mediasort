@@ -44,12 +44,29 @@ def make_thumbnail(filename, wh=300):
 
         l.info("Could not generate thumbnail")
         l.debug(e)
-        return "", ""
+    
+    return "", ""
+
+# I don't think the equivilent in static_ffmpeg works
+def load_ffmpeg():
+  import shutil
+  l = logging.getLogger("mediasort.system.load_ffmpeg")
+  l.info("Checking for FFMPEG")
+  
+  if shutil.which("ffmpeg") is None:
+    l.warn("Could not find FFMPEG")
+    static_ffmpeg.add_paths()
+  else:
+    l.info("Found FFMPEG")
 
 def make_thumbnail_ffmpeg(filename, wh):
-  static_ffmpeg.add_paths(True) # If ffmpeg doesn't exist, get a version
+  
+  if "ffmpeg" not in g:
+    load_ffmpeg()
+    g.ffmpeg = True
+
   ffmpeg = (
-      FFmpeg(executable='static_ffmpeg')
+      FFmpeg()
       .input(filename)
       .output(
           "pipe:1",
