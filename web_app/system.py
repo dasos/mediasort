@@ -60,7 +60,15 @@ def make_thumbnail_ffmpeg(filename, wh):
       )
   )
 
-  return ffmpeg.execute(), "image/webp"
+  @ffmpeg.on("stderr")
+  def on_stderr(line):
+    print(line)
+  
+  try:
+    return ffmpeg.execute(), "image/webp"
+  except Exception as e:
+     print (e)
+     print ("FFMPEG error")
   
 
 def make_thumbnail_pil(filename, wh):
