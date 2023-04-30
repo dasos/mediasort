@@ -5,7 +5,7 @@ import requests
 from PIL import UnidentifiedImageError, Image, ImageOps
 from io import BytesIO
 import static_ffmpeg
-from ffmpeg import FFmpeg
+import ffmpeg
 
 def get_db():
 
@@ -65,27 +65,17 @@ def make_thumbnail_ffmpeg(filename, wh):
     load_ffmpeg()
     g.ffmpeg = True
 
-  ffmpeg = (
-      FFmpeg()
-      .input(filename)
-      .output(
-          "pipe:1",
-          r=2, # frames per sec
-          t=10, # max length
-          f="webp",
-          vf=f"scale={wh}:-2",
-      )
+  out, _ = (
+    ffmpeg
+    .input(filename)
+    .trim(duration=5)
+    .filter('scale', wh, -12)
+    .filter('fps', fps=2, round='up')
+    .output('pipe:', format='webp')
+    .run(capture_stdout=True)
   )
-
-  @ffmpeg.on("stderr")
-  def on_stderr(line):
-    print(line)
   
-  try:
-    return ffmpeg.execute(), "image/webp"
-  except Exception as e:
-     print (e)
-     print ("FFMPEG error")
+  return out, "image/webp"
   
 
 def make_thumbnail_pil(filename, wh):

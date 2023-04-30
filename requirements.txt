@@ -3,7 +3,7 @@ Flask==2.2.3
 PyExifTool==0.5.5
 python-dateutil==2.8.2
 Pillow==9.5.0 
-python-ffmpeg
+ffmpeg-python
 static_ffmpeg
 gunicorn
 flask-redis
