@@ -64,11 +64,16 @@ def make_thumbnail_ffmpeg(filename, wh):
   if "ffmpeg" not in g:
     load_ffmpeg()
     g.ffmpeg = True
+    
+  if wh > current_app.config.get("THUMBNAIL_SIZE"):
+    clip_length = current_app.config.get("DETAIL_VIDEO_LENGTH")
+  else:
+    clip_length = current_app.config.get("THUMBNAIL_VIDEO_LENGTH")
 
   out, _ = (
     ffmpeg
     .input(filename)
-    .trim(duration=5)
+    .trim(duration=clip_length)
     .filter('scale', wh, -12)
     .filter('fps', fps=2, round='up')
     .output('pipe:', format='webp')
@@ -83,7 +88,7 @@ def make_thumbnail_pil(filename, wh):
     buffered = BytesIO()
     
     im = Image.open(filename)
-    if (wh > 500): # A poor rule of thumb
+    if wh > current_app.config.get("THUMBNAIL_SIZE"):
       im.thumbnail(size) # Keeps aspect ratio, with no crops
     else:
       im = ImageOps.fit(im, size) # Crops, will be square

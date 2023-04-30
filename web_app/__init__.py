@@ -11,11 +11,12 @@ def create_app(config_map=None):
     # us know if we are in a dev environment
     app.config.from_prefixed_env()
 
-    # Load the defaults from the appropriate file
+    # Always get the defaults
+    app.config.from_pyfile("../default_config.py")
+
+    # Overwrite with others if needed
     if app.config.get("DEBUG"):
         app.config.from_pyfile("../default_config_dev.py")
-    else:
-        app.config.from_pyfile("../default_config.py")
 
     # Pull in the env variables again, to overwrite anything here
     app.config.from_prefixed_env()

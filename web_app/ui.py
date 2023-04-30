@@ -71,8 +71,14 @@ def detach(item_id, set_id):
 
 @bp.route("/thumbnail/<string:item_id>")
 @bp.route("/thumbnail/<int:size>/<string:item_id>")
-def get_thumbnail(item_id, size=300):
+@bp.route("/thumbnail/<string:type>/<string:item_id>")
+def get_thumbnail(item_id, size=None, type=None):
     """Returns a wonderful thumbnail from the id"""
+
+    if type == "detail":
+      size = current_app.config.get("DETAIL_SIZE")
+    elif type is not None or size is None:
+      size = current_app.config.get("THUMBNAIL_SIZE")
 
     path = data.get_item_path(item_id)
 
