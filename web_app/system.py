@@ -160,9 +160,15 @@ def request_location(coords):
     if "name" in result:
         return result["name"]
 
+    if "locality" in result:
+        return result["locality"]
+        
+    if "district" in result:
+        return result["district"]
+
     if "city" in result:
         return result["city"]
         
-    l.error(f"Could not find name or city in: {r.text}")
+    l.error(f"Could not find useful features in: {r.text}")
 
     return ""
