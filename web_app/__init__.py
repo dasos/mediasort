@@ -20,6 +20,8 @@ def create_app(config_map=None):
 
     # Pull in the env variables again, to overwrite anything here
     app.config.from_prefixed_env()
+    
+    print (app.config.get("INPUT_DIR"))
 
     # Override anything being passed in specifically
     if config_map is not None:

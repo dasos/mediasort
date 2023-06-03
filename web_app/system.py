@@ -116,37 +116,46 @@ def get_location(coords):
 
     result = request_location(rounded_coords)
 
-    redis_client.set(rounded_coords_key, result)
-    logging.getLogger("mediasort.system.get_location").info(
-        f"Storing {result} in db location cache under {rounded_coords_key}"
-    )
-
+    if result != "":
+      logging.getLogger("mediasort.system.get_location").info(
+          f"Storing {result} in db location cache under {rounded_coords_key}"
+      )
+      redis_client.set(rounded_coords_key, result)
+    
     return result
 
 
 def request_location(coords):
+    l = logging.getLogger("mediasort.system.get_location")
+
     payload = {"lat": coords[0], "lon": coords[1]}
 
     try:
         r = requests.get("https://photon.komoot.io/reverse", params=payload)
     except Exception:
-        logging.getLogger("mediasort.system.get_location").error(
+        l.error(
             "Error resolving coord"
         )
         return ""
 
     if "features" not in r.json() or len(r.json()["features"]) != 1:
-        logging.getLogger("mediasort.system.get_location").warning(
-            f"Could not find location feature in : {r.text}"
+        l.warning(
+            f"Could not find location feature in: {r.text}"
         )
         return ""
 
     result = r.json()["features"][0]["properties"]
+    
+    l.debug(
+            f"Looked up: {payload}. Complete result: {r.text}"
+        )
 
     if "name" in result:
         return result["name"]
 
     if "city" in result:
         return result["city"]
+        
+    l.error(f"Could not find name or city in: {r.text}")
 
-    return result
+    return ""
