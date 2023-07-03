@@ -2,7 +2,7 @@ exifread==3.0.0
 Flask==2.3.2
 PyExifTool==0.5.5
 python-dateutil==2.8.2
-Pillow==9.5.0 
+Pillow==10.0.0 
 ffmpeg-python
 static_ffmpeg
 gunicorn
