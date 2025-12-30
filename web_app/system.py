@@ -138,13 +138,20 @@ def request_location(coords):
         )
         return ""
 
-    if "features" not in r.json() or len(r.json()["features"]) != 1:
+    j = {} 
+    try:
+        j = r.json()
+    except Exception:
+        l.error(f"Couldn't parse JSON: {r.text}")
+        return ""
+    
+    if "features" not in j or len(j["features"]) != 1:
         l.warning(
             f"Could not find location feature in: {r.text}"
         )
         return ""
 
-    result = r.json()["features"][0]["properties"]
+    result = j()["features"][0]["properties"]
     
     l.debug(
             f"Looked up: {payload}. Complete result: {r.text}"
