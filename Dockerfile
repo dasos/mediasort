@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.14
 
 RUN apt-get update -qq \
     && apt-get -y --no-install-recommends install exiftool \
