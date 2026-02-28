@@ -1,4 +1,4 @@
-from web_app import create_app, system
+from web_app import data
 import json
 
 import test_data
@@ -43,9 +43,6 @@ def test_debug(client_data):
 
     assert response.status_code == 200
     assert len(status["items"]) == test_data.LENGTH_OF_MEDIAITEMS
-    assert len(status["sets"]) == test_data.LENGTH_OF_SETS
-
-    # id = (list(status["items"][0].values())[0]['id'])
 
 
 def test_suggestions(client_data):
@@ -57,9 +54,9 @@ def test_suggestions(client_data):
     assert status == []
 
 
-def test_suggestions_content(client_data):
-    redis_client = system.get_db()
-    redis_client.sadd("mediasort:suggestions", "test")
+def test_suggestions_content(client_data, app):
+    with app.app_context():
+        data.add_suggestion("test")
 
     response = client_data.get("/api/suggestions")
 
@@ -69,39 +66,45 @@ def test_suggestions_content(client_data):
     assert status == ["test"]
 
 
-def test_move_set(client_tuple_data):
+def test_items_api(client_data):
+    response = client_data.get("/api/items?limit=3")
 
-    client, _, sets = client_tuple_data
+    status = json.loads(response.data)
 
-    response = client.get("/api/debug")
-    print(json.loads(response.data))
+    assert response.status_code == 200
+    assert len(status["items"]) == 3
+    assert status["next_after"] is not None
 
-    set_id = sets[0]["id"]
 
-    formdata = {"name": "hello_world"}
-    response = client.post(f"/api/set/save_date/{set_id}", data=formdata)
+def test_move_set(client_tuple_data, app):
 
-    print(response)
+    client, items = client_tuple_data
+
+    item_ids = [item["id"] for item in items]
+
+    set_one = item_ids[:2]
+    set_two = item_ids[2:4]
+    set_three = item_ids[4:5]
+
+    formdata = {"name": "hello_world", "item_ids": set_one}
+    response = client.post("/api/set/save_date", json=formdata)
 
     assert response.status_code == 200
     assert json.loads(response.data)["data"]["result"] == "OK"
 
-    set_id = sets[1]["id"]
-
-    formdata = {"name": "hello_world"}
-    response = client.post(f"/api/set/save_no_date/{set_id}", data=formdata)
+    formdata = {"name": "hello_world", "item_ids": set_two}
+    response = client.post("/api/set/save_no_date", json=formdata)
 
     assert json.loads(response.data)["data"]["result"] == "OK"
 
-    set_id = sets[2]["id"]
-
-    formdata = {"name": "hello_world"}
-    response = client.post(f"/api/set/delete/{set_id}", data=formdata)
+    formdata = {"name": "hello_world", "item_ids": set_three}
+    response = client.post("/api/set/delete", json=formdata)
 
     assert json.loads(response.data)["data"]["result"] == "OK"
 
-    response = client.get("/api/debug")
+    with app.app_context():
+        remaining = data.get_item_count()
 
-    print(response)
-
-    assert len(json.loads(response.data)["sets"]) == test_data.LENGTH_OF_SETS - 3
+    assert remaining == test_data.LENGTH_OF_MEDIAITEMS - (
+        len(set_one) + len(set_two) + len(set_three)
+    )

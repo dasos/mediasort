@@ -18,11 +18,7 @@
 	</div>
 </div>
 
-<div id="sets-container">
-{% for set in sets %}
-{% include 'set.html' %}
-{% endfor %}
-</div>
+<div id="sets-container"></div>
 
 <div id="empty-sets-container">
 <h2>There is nothing to sort</h2>
@@ -57,164 +53,460 @@
 
 <script type="text/javascript">
 
-<!-- The typeahead stuff -->
+const config = {
+  gapHours: {{ gap_hours | int }},
+  summaryItems: {{ summary_items | int }},
+  setsPerBatch: {{ sets_shown | int }},
+  itemsPerPage: {{ items_per_page | int }},
+  basePath: {{ base_path | tojson }}
+};
 
+const state = {
+  loadingItems: false,
+  hasMore: true,
+  nextAfter: null,
+  currentSet: null,
+  completedSets: [],
+  renderedCount: 0,
+  setsById: {}
+};
+
+const gapSeconds = config.gapHours * 60 * 60;
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatDateTime(ts) {
+  const d = new Date(ts * 1000);
+  const date = d.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  return { date, time };
+}
+
+function formatSetHeader(startTs, endTs) {
+  const start = formatDateTime(startTs);
+  const end = formatDateTime(endTs);
+  let header = `${start.date} at ${start.time}`;
+  if (startTs !== endTs) {
+    header += ` - ${end.time}`;
+  }
+  return header;
+}
+
+function makeSet(items) {
+  const startTs = items[0].timestamp;
+  const endTs = items[items.length - 1].timestamp;
+  const uiId = `set-${items[0].id}-${items[items.length - 1].id}`;
+  return {
+    uiId,
+    items,
+    startTs,
+    endTs,
+    expanded: false,
+    name: ""
+  };
+}
+
+function ingestItems(items) {
+  for (const item of items) {
+    if (!state.currentSet) {
+      state.currentSet = makeSet([item]);
+      continue;
+    }
+
+    const lastItem = state.currentSet.items[state.currentSet.items.length - 1];
+    if (item.timestamp - lastItem.timestamp > gapSeconds) {
+      finalizeCurrentSet();
+      state.currentSet = makeSet([item]);
+      continue;
+    }
+
+    state.currentSet.items.push(item);
+    state.currentSet.endTs = item.timestamp;
+  }
+}
+
+function finalizeCurrentSet() {
+  if (!state.currentSet) return;
+  state.completedSets.push(state.currentSet);
+  state.setsById[state.currentSet.uiId] = state.currentSet;
+  state.currentSet = null;
+}
+
+async function fetchItems() {
+  if (!state.hasMore || state.loadingItems) return;
+  state.loadingItems = true;
+
+  const params = new URLSearchParams();
+  params.set("limit", config.itemsPerPage);
+  if (state.nextAfter) {
+    params.set("after_ts", state.nextAfter.timestamp);
+    params.set("after_id", state.nextAfter.id);
+  }
+
+  const response = await fetch(`/api/items?${params.toString()}`);
+  const payload = await response.json();
+
+  ingestItems(payload.items || []);
+
+  state.hasMore = payload.has_more;
+  state.nextAfter = payload.next_after;
+
+  if (!state.hasMore) {
+    finalizeCurrentSet();
+  }
+
+  state.loadingItems = false;
+}
+
+async function ensureSetsAvailable(targetCount) {
+  while (state.hasMore && state.completedSets.length < targetCount) {
+    await fetchItems();
+  }
+
+  if (!state.hasMore && state.currentSet) {
+    finalizeCurrentSet();
+  }
+}
+
+function renderItem(item, setId, allowRemove) {
+  const filename = escapeHtml(item.orig_filename);
+  const directory = escapeHtml(item.orig_directory || "");
+  const dateTime = escapeHtml(new Date(item.timestamp * 1000).toLocaleString());
+  const location = escapeHtml(item.location || "");
+  const hasCoords = item.coords_lat !== null && item.coords_lat !== undefined;
+  const basePath = config.basePath || "";
+  const shortDirectory = directory.startsWith(basePath) ? directory.replace(basePath, "") : directory;
+
+  let locationHtml = "";
+  if (location && hasCoords) {
+    locationHtml = `
+      <div class="row py-2">
+        <div class="col-5 px-2 font-weight-bold">Location</div>
+        <div class="col px-2 text-right text-truncate" data-toggle="tooltip" title="${location}">
+          <a href="https://www.openstreetmap.org/?mlat=${item.coords_lat}&mlon=${item.coords_lon}#map=18/${item.coords_lat}/${item.coords_lon}" target="_BLANK">
+            ${location}
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
+  let directoryHtml = "";
+  if (directory && directory !== basePath) {
+    directoryHtml = `
+      <div class="row py-2">
+        <div class="col-5 px-2 font-weight-bold">Directory</div>
+        <div class="col px-2 text-right text-truncate" data-toggle="tooltip" title="${directory}">${shortDirectory}</div>
+      </div>
+    `;
+  }
+
+  const removeHtml = allowRemove ? `
+      <div class="float-right">
+        <form class="form-inline">
+          <input type="hidden" name="item_id" value="${item.id}">
+          <button type="button" class="btn btn-link remove-from-set"><i class="fas fa-unlink"></i> Remove from set</button>
+        </form>
+      </div>
+  ` : "";
+
+  return `
+    <div class="item col-lg-4 col-md-6 col-12 mb-4" data-item_id="${item.id}" data-set_id="${setId}">
+      <div class="card h-100">
+        <a href="thumbnail/detail/${item.id}" target="_blank"><img src="thumbnail/${item.id}" loading="lazy" class="card-img-top" /></a>
+        <div class="alert alert-warning text-center d-none" role="alert">No thumbnail available</div>
+        <div class="card-body">
+          <div class="striped">
+            <div class="row py-2">
+              <div class="col-5 px-2 font-weight-bold">Filename</div>
+              <div class="col px-2 text-right text-truncate" data-toggle="tooltip" title="${filename}">${filename}</div>
+            </div>
+            ${directoryHtml}
+            ${locationHtml}
+            <div class="row py-2">
+              <div class="col-5 px-2 font-weight-bold">Date/time</div>
+              <div class="col px-2 text-right text-truncate">${dateTime}</div>
+            </div>
+          </div>
+          ${removeHtml}
+        </div>
+      </div>
+    </div>
+    <hr/>
+  `;
+}
+
+function renderSet(set) {
+  const header = formatSetHeader(set.startTs, set.endTs);
+  const totalItems = set.items.length;
+  const showSummary = !set.expanded && totalItems > config.summaryItems;
+
+  let items = set.items;
+  let showLoadAll = false;
+  if (showSummary) {
+    const half = Math.floor(config.summaryItems / 2);
+    items = set.items.slice(0, half).concat(set.items.slice(-half));
+    showLoadAll = true;
+  }
+
+  const allowRemove = totalItems > 1;
+  const itemsHtml = items.map(item => renderItem(item, set.uiId, allowRemove)).join("\n");
+  const midPoint = Math.floor(items.length / 2);
+
+  let loadAllHtml = "";
+  if (showLoadAll) {
+    loadAllHtml = `
+      <div class="col-12 text-center">
+        <button type="submit" class="btn btn-secondary more-thumbnails" data-set_id="${set.uiId}"><i class="fas fa-exchange-alt"></i> Load all</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="set card bg-light pb-2" data-set_id="${set.uiId}" data-start_timestamp="${set.startTs}">
+      <div class="container mt-2">
+        <div class="row">
+          <div class="col-8"><h4>${header}</h4></div>
+          <div class="col-4 text-right">
+            <span class="badge badge-primary" data-toggle="tooltip" title="Set ID: ${set.uiId}">${totalItems} photo${totalItems > 1 ? "s" : ""}</span>
+          </div>
+        </div>
+      </div>
+      <div class="container row">
+        ${itemsHtml}
+        ${loadAllHtml}
+      </div>
+      <div class="container">
+        <form class="form-inline">
+          <label class="sr-only" for="name">Name</label>
+          <input type="text" name="name" placeholder="Name" class="form-control typeahead" value="${escapeHtml(set.name)}" autocomplete="off" />
+          <button type="button" name="action" value="save_date" class="btn btn-primary ml-2 action-button"><i class="fas fa-calendar-day"></i> Save with date</button>
+          <button type="button" name="action" value="save_no_date" class="btn btn-secondary ml-2 action-button"><i class="fas fa-calendar-times"></i> Save without date</button>
+          <button type="button" class="btn btn-danger ml-2" data-toggle="modal" data-target="#confirmDelete"><i class="fas fa-trash-alt"></i> Delete</button>
+        </form>
+      </div>
+    </div>
+    <hr />
+  `;
+}
+
+function setEvents() {
+  $('[data-toggle="tooltip"]').tooltip();
+
+  $('img').on('error', function() {
+    $(this).hide();
+    $(this).parent().next().removeClass("d-none");
+  });
+
+  $('[name=name].typeahead:not(.tt-input)').typeahead({
+    hint: true,
+    highlight: true,
+    minLength: 0
+  },
+  {
+    name: 'name',
+    source: names
+  });
+}
+
+function decideEmptyState() {
+  if ($('.set').length === 0) {
+    $('#empty-sets-container').show('slow');
+  } else {
+    $('#empty-sets-container').hide();
+  }
+}
+
+function updateStats() {
+  const setCount = state.completedSets.length;
+  const itemCount = state.completedSets.reduce((sum, s) => sum + s.items.length, 0);
+  if (setCount === 0) {
+    $('#stats').hide();
+  } else {
+    $('#stats').show().html(`${setCount} Sets ${itemCount} Items`);
+  }
+}
+
+function renderNextBatch() {
+  const start = state.renderedCount;
+  const end = Math.min(state.completedSets.length, start + config.setsPerBatch);
+  if (end <= start) return;
+
+  const setsContainer = $('#sets-container');
+  for (let i = start; i < end; i++) {
+    const set = state.completedSets[i];
+    setsContainer.append(renderSet(set));
+    state.renderedCount += 1;
+  }
+
+  setEvents();
+  decideEmptyState();
+  updateStats();
+}
+
+async function loadMoreSets() {
+  if (state.loadingItems) return;
+  await ensureSetsAvailable(state.renderedCount + config.setsPerBatch);
+  renderNextBatch();
+}
+
+function reloadAll() {
+  state.loadingItems = false;
+  state.hasMore = true;
+  state.nextAfter = null;
+  state.currentSet = null;
+  state.completedSets = [];
+  state.renderedCount = 0;
+  state.setsById = {};
+  $('#sets-container').empty();
+  updateStats();
+  loadMoreSets();
+}
+
+// The typeahead stuff
 var names = new Bloodhound({
   datumTokenizer: Bloodhound.tokenizers.whitespace,
   queryTokenizer: Bloodhound.tokenizers.whitespace,
   prefetch: {
-  	cache: false,
-  	url: "api/suggestions"
+    cache: false,
+    url: "api/suggestions"
   }
 });
 
-// Called when a set is added or changed
-function setEvents() {
-	
-	// Enable tooltips
-	$('[data-toggle="tooltip"]').tooltip();
-	
-	// Hides broken images
-	$('img').on('error', function() {
-	      $(this).hide();
-	      $(this).parent().next().removeClass("d-none");
-	});
-	
-	// Typeahead :)
-	$('[name=name].typeahead:not(.tt-input)').typeahead({
-	  hint: true,
-	  highlight: true,
-	  minLength: 0
-	},
-	{
-	  name: 'name',
-	  source: names
-	});
-	
-};
 setEvents();
 
-
-// Reloads, then redirects
 $('#reload').on('click', function (event) {
-    $.ajax({
-      url: "/api/reload"
-    }).then(function(data) {
-    	statusCheck();
-    });
-    /*.then(function(data) {
-      window.location('/');
-    });*/
+  $.ajax({
+    url: "/api/reload"
+  }).then(function() {
+    statusCheck();
+    reloadAll();
+  });
 });
 
-var setsContainer = $('#sets-container');
-var emptyStateContainer = $('#empty-sets-container');
-
-// This is a bit of a workaround, but it displays a div if there are no sets
-function decideEmptyState() {
-	if (setsContainer[0].innerText.length == 0) {
-	    emptyStateContainer.show('slow');
-	  } else {
-	  	emptyStateContainer.hide();
-	  }
-};
-decideEmptyState();
-
-
-// Adds the set id into the fake set div in the delete pop-up box
 $('#confirmDelete').on('show.bs.modal', function (event) {
   var id = $(event.relatedTarget).closest(".set").data("set_id");
   $('#fake-set').data("set_id", id);
 });
 
-// Deals with all the buttons. Finds information in the dom, constructs the query, then posts to the API
 $('#sets-container,#confirmDelete').on('click', '.action-button', function(e) {
-	var button = $(e.currentTarget);    	
-	var form = button.closest('form');
-	
-	// This will find the set id in either the real or fake set id
-	var set_id = form.closest(".set").data("set_id");
+  var button = $(e.currentTarget);
+  var form = button.closest('form');
+  var set_id = form.closest(".set").data("set_id");
+  var name_element = form.find('input[name=name]');
+  var name = name_element.val();
+  var action = button.attr('value');
+  var url = "/api/set/" + action;
 
-	var name_element = form.find('input[name=name]');
-	var name = form.find('input[name=name]').val();
-	var action = button.attr('value');
-	var url = "/api/set/" + action + "/" + set_id;
-	var d = {'name': name};
-	
-	$.post(url, d, function(result) {
-		
-		// Adds the name to the suggestions engine
-		names.add([name]);
-		
-		// Close the delete modal if it is open
-		$('#confirmDelete').modal('hide');
-		
-		// I don't think this finds the fake set, because jQuery doesn't actually update the dom when then data is set
-		var set_element = $('[data-set_id="' + set_id + '"]'); //$('#set-'+set_id);
+  var set = state.setsById[set_id];
+  if (!set) return;
 
-		set_element.hide('slow', function() { 
-			set_element.remove(); 
-			loadMore(); // Loads more if we are at the bottom
-		});
-		set_element.next("hr").remove();
-		
-		statusCheck();
-		
-	}, 'json').fail(function(result) {
-		message = result.responseJSON.data.error;
-		name_element.tooltip({ 'title': message, 'trigger': 'manual'}).tooltip('show');
-	});
-
-});
-
-
-
-// Clears the tooltip when you click a button
-$('#sets-container').on('click', 'button', function(e) {
-	$('input[name=name]').tooltip('hide');
-});
-
-
-
-
-// Gets more more thumbnails on click
-$('#sets-container').on('click', '.more-thumbnails', function(e) {
-	e.preventDefault(); 
-    var target = $(this).closest(".set");
-    var name = target.find('input[name=name]').val();
-	$(this).replaceWith('<i class="fas fa-spinner fa-spin"></i>');
-	$.ajax({
-       //url: '/set/' + $(this).data('set_id') + '?' + jQuery.param({start: start + difference, end: end + difference}),
-	   url: '/set/' + $(this).data('set_id'),
-       success: function(result) {
-	   	 target.next("hr").remove();
-         target.replaceWith(result);
-         target.find('input[name=name]').val(name);
-         console.log(target.find('input[name=name]').val())
-		 setEvents()
+  $.ajax({
+    url: url,
+    type: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify({
+      name: name,
+      item_ids: set.items.map(item => item.id)
+    })
+  }).done(function(result) {
+    if (name) {
+      names.add([name]);
+      set.name = name;
     }
-	});
-});
 
+    $('#confirmDelete').modal('hide');
 
-// Removes an item from a set
-$('#sets-container').on('click', '.remove-from-set', function(e) {
-	e.preventDefault();
-
-    var set = $(this).closest(".set");
-	var item = $(this).closest(".item");
-	
-	$.post('/detach/' + set.data('set_id') + '/' + item.data("item_id"),
-	function(result) {
-		 //item.hide('slow', function(){ item.remove(); });
-		 item.remove();
-         set.before(result);//.hide() //.show('slow');
-		 setEvents();
+    var set_element = $('[data-set_id="' + set_id + '"]');
+    set_element.hide('slow', function() {
+      set_element.next("hr").remove();
+      set_element.remove();
+      delete state.setsById[set_id];
+      state.completedSets = state.completedSets.filter(s => s.uiId !== set_id);
+      state.renderedCount = $('.set').length;
+      loadMoreSets();
     });
+
+    statusCheck();
+  }).fail(function(result) {
+    var message = result.responseJSON.data.error;
+    name_element.tooltip({ 'title': message, 'trigger': 'manual'}).tooltip('show');
+  });
 });
 
+$('#sets-container').on('click', 'button', function(e) {
+  $('input[name=name]').tooltip('hide');
+});
 
-// Performs a status check on load
+$('#sets-container').on('click', '.more-thumbnails', function(e) {
+  e.preventDefault();
+  var target = $(this).closest(".set");
+  var set_id = target.data('set_id');
+  var set = state.setsById[set_id];
+  if (!set) return;
+
+  set.expanded = true;
+  var name = target.find('input[name=name]').val();
+  target.next("hr").remove();
+  target.replaceWith(renderSet(set));
+  $('[data-set_id="' + set_id + '"]').find('input[name=name]').val(name);
+  setEvents();
+});
+
+$('#sets-container').on('click', '.remove-from-set', function(e) {
+  e.preventDefault();
+
+  var itemElement = $(this).closest('.item');
+  var setElement = $(this).closest('.set');
+  var setId = setElement.data('set_id');
+  var itemId = itemElement.data('item_id');
+
+  var set = state.setsById[setId];
+  if (!set) return;
+
+  const removedItems = set.items.filter(item => item.id === itemId);
+  if (removedItems.length === 0) return;
+
+  set.items = set.items.filter(item => item.id !== itemId);
+  if (set.items.length > 0) {
+    set.startTs = set.items[0].timestamp;
+    set.endTs = set.items[set.items.length - 1].timestamp;
+  }
+
+  itemElement.remove();
+
+  if (set.items.length === 0) {
+    setElement.next("hr").remove();
+    setElement.remove();
+    delete state.setsById[setId];
+    state.completedSets = state.completedSets.filter(s => s.uiId !== setId);
+  }
+
+  const newSet = makeSet(removedItems);
+  state.completedSets.push(newSet);
+  state.completedSets.sort((a, b) => a.startTs - b.startTs);
+  state.setsById[newSet.uiId] = newSet;
+
+  $('#sets-container').append(renderSet(newSet));
+  setEvents();
+  updateStats();
+});
 
 var statusCheck = function() {
   console.log('Sending AJAX request...');
@@ -222,70 +514,34 @@ var statusCheck = function() {
     url: "/api/status"
   }).then(function(data) {
     console.log("Status: ", data)
-    $('#stats').show().html(`${data.set_count} Sets ${data.item_count} Items`)
     if (data.status == "loading") {
-    	$('#status').show()
-    	$('#reload').hide()
+      $('#status').show()
+      $('#reload').hide()
       setTimeout(statusCheck, 5 * 1000);
     } else {
-    	$('#status').hide()
-    	$('#reload').show()
+      $('#status').hide()
+      $('#reload').show()
     }
   });
 }
 
 statusCheck();
 
-
-
-
-
 var loadingSets = false;
 
-$(window).on("scroll", loadMore);
+$(window).on("scroll", function() {
+  const scrollHeight = $(document).height();
+  const scrollPos = Math.floor($(window).height() + $(window).scrollTop());
+  const isBottom = scrollHeight - 100 < scrollPos;
 
-function loadMore() {
-    const scrollHeight = $(document).height();
-    const scrollPos = Math.floor($(window).height() + $(window).scrollTop());
-    const isBottom = scrollHeight - 100 < scrollPos;
-    
-    //console.log(isBottom, currentscrollHeight, scrollHeight)
+  if (isBottom && !loadingSets) {
+    loadingSets = true;
+    loadMoreSets().finally(function() {
+      loadingSets = false;
+    });
+  }
+});
 
-    //if (isBottom && currentscrollHeight < scrollHeight) {
-    console.log((isBottom && !loadingSets))
-    if (isBottom && !loadingSets) {
-    	loadingSets = true;
-		//var counter = $('.set').length - 1; // Reducing by one to miss out the fake set in the modal
-		var last_id = $('.set').not("#fake-set").last().data('start_timestamp');
-		if (!last_id) last_id = 0;
-	    $.ajax({
-		    url: "set/more_from/" + last_id,
-		
-	        success: function (result) {
-	        	//console.log(result)
-	        	$('#sets-container').append(result);
-				setEvents();
-
-	        	loadingSets = false;
-	        },
-			
-			complete: function () {
-				decideEmptyState();
-			},
-	    });
-        //currentscrollHeight = scrollHeight;
-    }
-}
-
-
+loadMoreSets();
 </script>
-
-<style>
-div.striped > div:nth-of-type(odd) {
-    background: #eee;
-}
-
-
-</style>
-
 {% endblock %}

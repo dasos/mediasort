@@ -7,15 +7,15 @@ def test_thumbnail():
     assert len(thumbnail) > 7000 and len(thumbnail) < 10000
 
 
-def test_location(redis_client):
-
-    location = system.get_location((51.50084130000768, -0.14298782563424842))
+def test_location(app):
+    with app.app_context():
+        location = system.get_location((51.50084130000768, -0.14298782563424842))
 
     assert location == "Buckingham Palace"
 
 
-def test_location_nothing(redis_client):
-
-    location = system.get_location((50, 0))  # In the English Channel
+def test_location_nothing(app):
+    with app.app_context():
+        location = system.get_location((50, 0))  # In the English Channel
 
     assert location == ""

@@ -1,14 +1,17 @@
 import pytest
-from web_app import create_app, data, system
+from web_app import create_app, data
 
 
 @pytest.fixture
-def app():
+def app(tmp_path):
+
+    db_path = tmp_path / "mediasort.db"
 
     app = create_app(
         {
             "TESTING": True,
             "INPUT_DIR": "images",
+            "DB_PATH": str(db_path),
             "EXECUTOR_PROPAGATE_EXCEPTIONS": True,
         }
     )
@@ -28,40 +31,15 @@ def client_in_request(app):
 
 
 @pytest.fixture
-def redis_client(app):
-    with app.app_context():
-        with app.test_request_context():
-            data.populate_db()
-
-            redis_client = system.get_db()
-
-            yield redis_client
-
-
-@pytest.fixture
 def client_data(app):
     with app.app_context():
-
         data.populate_db()
-
         yield app.test_client()
 
 
 @pytest.fixture
 def client_tuple_data(app):
     with app.app_context():
-
         data.populate_db()
-
-        redis_client = system.get_db()
-
-        items = [
-            redis_client.hgetall(name)
-            for name in redis_client.scan_iter(match="mediasort:item-meta-*")
-        ]
-        sets = [
-            redis_client.hgetall(name)
-            for name in redis_client.scan_iter(match="mediasort:set-meta-*")
-        ]
-
-        yield app.test_client(), items, sets
+        items, _, _ = data.get_items(limit=10000)
+        yield app.test_client(), items
