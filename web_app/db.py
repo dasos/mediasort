@@ -3,7 +3,9 @@ from flask import current_app, g
 
 
 def connect_db(path):
-    conn = sqlite3.connect(path, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn = sqlite3.connect(
+        path, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False
+    )
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -20,7 +22,10 @@ def get_db():
 def close_db(_=None):
     db = g.pop("sqlite_db", None)
     if db is not None:
-        db.close()
+        try:
+            db.close()
+        except sqlite3.ProgrammingError:
+            pass
 
 
 def init_db():
