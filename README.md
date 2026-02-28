@@ -8,7 +8,7 @@ MediaSort is a Python3 web UI that helps you sort media items into folders. The 
 
 The workflow is like this, assuming you keep the defaults:
 - First, all the files in the input directory are scanned. Each file is stored in SQLite with its metadata. The UI groups files into sets client-side using a configurable time gap (default is 2 hours). This means that photos taken relatively close together (in terms of time) will be in the same set. The time is taken from the EXIF of the photo. If there isn't any EXIF, the file is ignored.
-- This is then shown in the UI. Six items in each set are shown (the first three and the last three), with each item showing a location (pulled from the EXIF of the photo, and geolocated), plus the date and time.  You can then decide what to do with the set.
+- This is then shown in the UI. Six items in each set are shown (the first three and the last three), with each item showing a location (pulled from the EXIF of the photo and resolved during scanning using Geoapify reverse geocoding), plus the date and time.  You can then decide what to do with the set.
   - You can **save with date**. This will create a directory in the output folder called `yyyy/yyyy-mm/yyyy-mm-dd <name>`. It'll then move all the files in the set there.
   - You can **save without date**. This will create a directory in the output folder called `<name>`. It'll then move all the files in the set there.
   - You can **delete**. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
@@ -49,6 +49,7 @@ Install the dependancies (exiftool may need some help):
 Set the variables:
 
     export FLASK_DB_PATH="/config/mediasort.db"
+    export FLASK_GEOAPIFY_API_KEY="<your_key>"
     export FLASK_DEBUG=true
 
 Execute:

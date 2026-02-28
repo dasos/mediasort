@@ -13,6 +13,7 @@ services:
      #- /config:/config
     environment:
      - 'FLASK_DB_PATH=/config/mediasort.db'
+     #- 'FLASK_GEOAPIFY_API_KEY=your_key'
      #- 'FLASK_DRY_RUN=TRUE'
      # Uncomment the file above to actually make changes to your files
      #- 'FLUSH=TRUE'

@@ -111,49 +111,53 @@ def get_location(coords):
 
 
 def request_location(coords):
-    l = logging.getLogger("mediasort.system.get_location")
+    l = logging.getLogger("mediasort.system.request_location")
 
-    payload = {"lat": coords[0], "lon": coords[1]}
-
-    try:
-        r = requests.get("https://photon.komoot.io/reverse", params=payload)
-    except Exception:
-        l.error(
-            "Error resolving coord"
-        )
+    api_key = current_app.config.get("GEOAPIFY_API_KEY")
+    if not api_key:
+        l.warning("Missing GEOAPIFY_API_KEY; skipping reverse geocode lookup")
         return ""
 
-    j = {} 
+    payload = {
+        "lat": coords[0],
+        "lon": coords[1],
+        "format": "json",
+        "apiKey": api_key,
+    }
+
     try:
-        j = r.json()
+        r = requests.get("https://api.geoapify.com/v1/geocode/reverse", params=payload)
+    except Exception:
+        l.error("Error resolving coord")
+        return ""
+
+    if r.status_code != 200:
+        l.warning(f"Reverse geocode error: {r.status_code} {r.text}")
+        return ""
+
+    try:
+        data = r.json()
     except Exception:
         l.error(f"Couldn't parse JSON: {r.text}")
         return ""
-    
-    if "features" not in j or len(j["features"]) != 1:
-        l.warning(
-            f"Could not find location feature in: {r.text}"
-        )
+
+    if "results" not in data or len(data["results"]) == 0:
+        l.warning(f"Could not find location result in: {r.text}")
         return ""
 
-    result = j()["features"][0]["properties"]
-    
-    l.debug(
-            f"Looked up: {payload}. Complete result: {r.text}"
-        )
+    result = data["results"][0]
 
-    if "name" in result:
+    l.debug(f"Looked up: {payload}. Complete result: {r.text}")
+
+    if "address_line1" in result and result["address_line1"]:
+        return result["address_line1"]
+
+    if "formatted" in result and result["formatted"]:
+        return result["formatted"]
+
+    if "name" in result and result["name"]:
         return result["name"]
 
-    if "locality" in result:
-        return result["locality"]
-        
-    if "district" in result:
-        return result["district"]
-
-    if "city" in result:
-        return result["city"]
-        
     l.error(f"Could not find useful features in: {r.text}")
 
     return ""

@@ -69,4 +69,18 @@ def test_get_items_order(app):
         data.populate_db()
         items, _, _ = data.get_items(limit=10000)
         timestamps = [item["timestamp"] for item in items]
-        assert timestamps == sorted(timestamps)
+    assert timestamps == sorted(timestamps)
+
+
+def test_location_populated_on_scan(app, monkeypatch):
+    monkeypatch.setattr(
+        "web_app.system.request_location", lambda coords: "Address Line 1"
+    )
+
+    with app.app_context():
+        data.populate_db()
+        items, _, _ = data.get_items(limit=10000)
+
+        locations = [item["location"] for item in items if item["location"]]
+
+    assert "Address Line 1" in locations
