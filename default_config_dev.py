@@ -1,8 +1,11 @@
 INPUT_DIR = "images"
 OUTPUT_DIR = "/output"
 DELETE_DIR = "/delete"
+DB_PATH = "/config/mediasort.db"
+SET_GAP_HOURS = 2
 SETS_SHOWN = 2
 SUMMARY_ITEMS = 2
+ITEMS_PER_PAGE = 20
 DEBUG_LEVEL = "DEBUG"
 DRY_RUN = True
 EXECUTOR_PROPAGATE_EXCEPTIONS = True

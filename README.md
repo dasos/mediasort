@@ -7,18 +7,18 @@ MediaSort is a Python3 web UI that helps you sort media items into folders. The 
 <img src="screenshot.png" width="600"/>
 
 The workflow is like this, assuming you keep the defaults:
-- First, all the files in the input directory are scanned. Each file will be automatically placed into a set. A set is a group of photos, seperated by 3 hours. This means that photos taken relatively close together (in terms of time) will be in the same set. The time is taken from the EXIF of the photo. If there isn't any EXIF, the file is ignored.
+- First, all the files in the input directory are scanned. Each file is stored in SQLite with its metadata. The UI groups files into sets client-side using a configurable time gap (default is 2 hours). This means that photos taken relatively close together (in terms of time) will be in the same set. The time is taken from the EXIF of the photo. If there isn't any EXIF, the file is ignored.
 - This is then shown in the UI. Six items in each set are shown (the first three and the last three), with each item showing a location (pulled from the EXIF of the photo, and geolocated), plus the date and time.  You can then decide what to do with the set.
-  - You can **save with date**. This will create a directory in the output folder called `yyyy/yyyy-mm/yyyy-mm-ddd <name>`. It'll then move all the files in the set there.
+  - You can **save with date**. This will create a directory in the output folder called `yyyy/yyyy-mm/yyyy-mm-dd <name>`. It'll then move all the files in the set there.
   - You can **save without date**. This will create a directory in the output folder called `<name>`. It'll then move all the files in the set there.
-  - You can **delet**e. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
+  - You can **delete**. This doesn't *really* delete the files in the set, but instead moves them to the deleted folder.
   - Additionally, for each item in a set, you can **remove from set**. This will detach it, and create a new set. This is useful if you want to split some sets up.
 - When you save a set with a name, the name is cached. This powers the typeahead, and lets you select the same name again. Note that using the same name multiple times is super common. It will effectively merge a set, assuming they have the same date.
 - And as you scrolling, more sets are loaded. If you want to load more photos for a set than the six, you can.
 
 ## Get it running
 ### Docker
-The easiest way is to take the Docker Compose file, modify some of the config, and then execute it. It will start the required Redis server too.  Note that the config is very conservative by default. No folders are mapped, and it runs in "dry-run" mode by default.
+The easiest way is to take the Docker Compose file, modify some of the config, and then execute it. It will start a single container running the app. SQLite is stored at `/config/mediasort.db` by default.
 
     docker-compose -f docker-compose.yml up
 
@@ -48,7 +48,7 @@ Install the dependancies (exiftool may need some help):
 
 Set the variables:
 
-    export FLASK_REDIS_URL="redis://<ip>:<port>/0"
+    export FLASK_DB_PATH="/config/mediasort.db"
     export FLASK_DEBUG=true
 
 Execute:
@@ -80,4 +80,3 @@ Auto-formatting is achieved using Black:
 And making sure you follow PEP 8 is done with Flake8, with the adjustments that Black recommend.
 
     python3 -m flake8
-

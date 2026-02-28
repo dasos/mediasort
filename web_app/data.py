@@ -1,325 +1,326 @@
 from codetiming import Timer
 
 import logging
-
-from flask import current_app
-from flask_executor import Executor
+import os
+import re
+import shutil
 from datetime import datetime
 
-from web_app import system
+from flask import current_app
+
+from web_app import db
 
 import MediaFiles
 from MediaItem import MediaItem
-from MediaSet import MediaSet, MediaSetStore
+from web_app import system
+
+STATUS_KEY = "status"
+
+
+def _set_status(value, conn=None):
+    if conn is None:
+        conn = db.get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        (STATUS_KEY, value),
+    )
+    conn.commit()
+
+
+def get_status():
+    conn = db.get_db()
+    row = conn.execute("SELECT value FROM meta WHERE key = ?", (STATUS_KEY,)).fetchone()
+    if row is None:
+        return None
+    return row["value"]
 
 
 def clear_db():
-
     message = (
         "*************************** DELETING FROM DB! ***************************"
     )
     logger = logging.getLogger("mediasort.system.clear_db")
     logger.warning(message)
 
-    redis_client = system.get_db()
+    conn = db.get_db()
 
-    # Save some stuff
     suggestions = []
-    locations = {}
-
+    locations = []
     if current_app.config.get("KEEP_SUGGESTIONS"):
-        suggestions = list(redis_client.smembers("mediasort:suggestions"))
+        suggestions = [
+            row["name"] for row in conn.execute("SELECT name FROM suggestions")
+        ]
     if current_app.config.get("KEEP_LOCATIONS"):
-        location_keys = redis_client.scan_iter(match="mediasort:coord-*")
-        for key in location_keys:
-            locations[key] = redis_client.get(key)
+        locations = [
+            (row["lat"], row["lon"], row["location"])
+            for row in conn.execute("SELECT lat, lon, location FROM location_cache")
+        ]
 
     if current_app.config.get("FLUSH"):
         logger.warning("Flushing DB")
-        redis_client.flushdb()
+        conn.execute("DELETE FROM items")
+        conn.execute("DELETE FROM suggestions")
+        conn.execute("DELETE FROM location_cache")
+        conn.execute("DELETE FROM meta")
     else:
         logger.warning("Deleting from DB")
-        for name in redis_client.scan_iter(match="mediasort:*"):
-            redis_client.delete(name)
+        conn.execute("DELETE FROM items")
+        conn.execute("DELETE FROM meta")
+        if not current_app.config.get("KEEP_SUGGESTIONS"):
+            conn.execute("DELETE FROM suggestions")
+        if not current_app.config.get("KEEP_LOCATIONS"):
+            conn.execute("DELETE FROM location_cache")
 
-    # Put it back
-    [redis_client.sadd("mediasort:suggestions", s) for s in suggestions]
-    [redis_client.set(key, value) for key, value in locations.items()]
+    if current_app.config.get("KEEP_SUGGESTIONS"):
+        conn.executemany(
+            "INSERT OR IGNORE INTO suggestions (name) VALUES (?)",
+            [(name,) for name in suggestions],
+        )
+    if current_app.config.get("KEEP_LOCATIONS"):
+        conn.executemany(
+            "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
+            locations,
+        )
+
+    conn.commit()
+
+
+def _lookup_location(conn, coords):
+    rounded_coords = round(float(coords[0]), 4), round(float(coords[1]), 4)
+
+    cached = conn.execute(
+        "SELECT location FROM location_cache WHERE lat = ? AND lon = ?",
+        (rounded_coords[0], rounded_coords[1]),
+    ).fetchone()
+    if cached is not None:
+        return cached["location"]
+
+    result = system.request_location(rounded_coords)
+    if result:
+        conn.execute(
+            "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
+            (rounded_coords[0], rounded_coords[1], result),
+        )
+    return result
+
+
+def _item_to_row(item, conn):
+    coords = item.get_coords()
+    location = ""
+    coords_lat = None
+    coords_lon = None
+    if coords:
+        coords_lat, coords_lon = coords
+        location = _lookup_location(conn, coords)
+    return {
+        "id": item.id,
+        "path": item.path,
+        "timestamp": int(item.timestamp.timestamp()),
+        "orig_filename": item.orig_filename,
+        "orig_directory": item.orig_directory,
+        "coords_lat": coords_lat,
+        "coords_lon": coords_lon,
+        "location": location,
+    }
 
 
 def populate_db(force=False):
-
     logger = logging.getLogger("mediasort.system.populate_db")
 
-    redis_client = system.get_db()
-
     def load_data(input_dir):
+        db_path = current_app.config.get("DB_PATH")
+        conn = db.connect_db(db_path)
 
-        for item, set in MediaFiles.load(input_dir):
+        _set_status("loading", conn)
 
-            save_set(set)
-            save_item(item, set)
+        conn.execute("BEGIN")
 
-        logger.info("Setting status as done.")
-        redis_client.set("mediasort:status", "done")
+        for path in MediaFiles.get_media(input_dir):
+            logger.debug(f"Loading path: {path}")
+            try:
+                item = MediaItem(path)
+            except Exception:
+                logger.warning(f"Unable to add file: {path}")
+                continue
 
-    #  status = redis_client.get('status')
-    #  if status == "loading":
-    #    logger.info ("Status is loading")
-    #    if force is False:
-    #      return False
+            row = _item_to_row(item, conn)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO items
+                    (id, path, timestamp, orig_filename, orig_directory, coords_lat, coords_lon, location)
+                VALUES
+                    (:id, :path, :timestamp, :orig_filename, :orig_directory, :coords_lat, :coords_lon, :location)
+                """,
+                row,
+            )
 
-    redis_client.set("mediasort:status", "loading")
+        conn.commit()
+        _set_status("done", conn)
+        conn.close()
 
     if current_app.testing:
         load_data(current_app.config.get("INPUT_DIR"))
     else:
         logger.info("Starting new thread for load")
+        from flask_executor import Executor
+
         executor = Executor(current_app)
         executor.submit(load_data, current_app.config.get("INPUT_DIR"))
+
     return
 
 
-def save_set(set):
-    """Saves a set to redis. Will also overwrite if needed."""
-
-    redis_client = system.get_db()
-    logger = logging.getLogger("mediasort.system.save_set")
-
-    # Adds the set into a sorted set, which has the start time as the score
-    redis_client.zadd("mediasort:sets", {set.id: set.start.timestamp()})
-
-    # Adds the set into a hash set. This stores a bit of information about the set, which reduces recalculation
-    redis_client.hset(
-        f"mediasort:set-meta-{set.id}",
-        mapping={
-            "length": set.length,
-            "start": int(set.start.timestamp()),
-            "end": int(set.end.timestamp()),
-            "id": set.id,
-        },
-    )
-
-    logger.debug(f"Saving set: {set.id}")
+def get_item_count():
+    conn = db.get_db()
+    row = conn.execute("SELECT COUNT(*) AS count FROM items").fetchone()
+    return row["count"]
 
 
-def save_item(item, set):
-    """Saves an item to redis."""
-
-    redis_client = system.get_db()
-    logger = logging.getLogger("mediasort.system.save_item")
-
-    # Adds the item into a hash set. We'll store some attributes about the item. When we want the media item back,
-    # we set them back to what they were it
-    # It is perhaps superfluous to add the ID, but we'll pop it in for testing purposes
-    redis_client.hset(
-        f"mediasort:item-meta-{item.id}",
-        mapping={
-            "path": item.path,
-            "timestamp": item.timestamp.timestamp(),
-            "id": item.id,
-        },
-    )
-
-    # Adds the item into a sorted set specific to the set. The timestamp of the item is the score
-    # We use this to find the right items to add them back in to the set
-    redis_client.zadd(
-        f"mediasort:set-items-{set.id}", {item.id: item.timestamp.timestamp()}
-    )
-
-    logger.debug(f"Inserting item id: {item.id} in to set: {set.id}")
+def add_suggestion(name):
+    conn = db.get_db()
+    conn.execute("INSERT OR IGNORE INTO suggestions (name) VALUES (?)", (name,))
+    conn.commit()
 
 
-def remove_set(set):
-    """Removes all information about a set from Redis"""
-    redis_client = system.get_db()
-    logger = logging.getLogger("mediasort.system.remove_set")
-    logger.debug(f"Set id: {set.id}")
-    redis_client.zrem("mediasort:sets", set.id)
-    redis_client.delete(f"mediasort:set-meta-{set.id}")
-    for item_id in redis_client.zrange(f"mediasort:set-items-{set.id}", 0, -1):
-        redis_client.delete(f"mediasort:item-meta-{item_id}")
-    redis_client.delete(f"mediasort:set-items-{set.id}")
-
-
-def remove_item(item, set):
-    """Remove a single item. It does not update the set information, so the set will need
-    to be resaved to update it."""
-    redis_client = system.get_db()
-    logger = logging.getLogger("mediasort.system.remove_set")
-    logger.debug(f"Removing item id: {item.id}")
-    redis_client.delete(f"mediasort:item-meta-{item.id}")
-    redis_client.zrem(f"mediasort:set-items-{set.id}", item.id)
+def get_suggestions():
+    conn = db.get_db()
+    return [row["name"] for row in conn.execute("SELECT name FROM suggestions")]
 
 
 def get_item_path(item_id):
-    """Returns just the path of the item, used in thumbnail creation and in recreating the item"""
-    redis_client = system.get_db()
-    return redis_client.hget(f"mediasort:item-meta-{item_id}", "path")
+    conn = db.get_db()
+    row = conn.execute("SELECT path FROM items WHERE id = ?", (item_id,)).fetchone()
+    if row is None:
+        return None
+    return row["path"]
 
 
-@Timer(name="get_item", text="{name}: {:.4f} seconds")
-def get_item(item_id):
-    """Get a single item by its id"""
+def get_items_by_ids(item_ids):
+    if not item_ids:
+        return {}
 
-    logger = logging.getLogger("mediasort.system.get_item")
-
-    path = get_item_path(item_id)
-    try:
-        item = MediaItem(path)
-        return item
-    except Exception:
-        logger.error(f"File has gone away: {path}")
-        raise
+    conn = db.get_db()
+    placeholders = ",".join(["?"] * len(item_ids))
+    rows = conn.execute(
+        f"SELECT * FROM items WHERE id IN ({placeholders})", item_ids
+    ).fetchall()
+    return {row["id"]: dict(row) for row in rows}
 
 
-@Timer(name="get_set", text="{name}: {:.4f} seconds")
-def get_set(set_id, limit=0, from_end=False, store=False, no_meta=False):
-    """Gets a single set by id, and, by default, all the items in it"""
+def delete_items(item_ids):
+    if not item_ids:
+        return
 
-    logger = logging.getLogger("mediasort.system.get_set")
+    conn = db.get_db()
+    placeholders = ",".join(["?"] * len(item_ids))
+    conn.execute(f"DELETE FROM items WHERE id IN ({placeholders})", item_ids)
+    conn.commit()
 
-    logger.debug(f"Trying to get set_id: {set_id}")
 
-    redis_client = system.get_db()
+@Timer(name="get_items", text="{name}: {:.4f} seconds")
+def get_items(limit=20, after_ts=None, after_id=None, order="asc"):
+    conn = db.get_db()
 
-    if store is False:
-        set = MediaSet()
+    order_sql = "ASC" if order.lower() != "desc" else "DESC"
+    params = []
+
+    where_clause = ""
+    if after_ts is not None:
+        if order_sql == "ASC":
+            where_clause = "WHERE (timestamp > ?) OR (timestamp = ? AND id > ?)"
+        else:
+            where_clause = "WHERE (timestamp < ?) OR (timestamp = ? AND id < ?)"
+        params.extend([after_ts, after_ts, after_id or 0])
+
+    query = (
+        "SELECT * FROM items "
+        f"{where_clause} "
+        f"ORDER BY timestamp {order_sql}, id {order_sql} "
+        "LIMIT ?"
+    )
+    params.append(limit + 1)
+
+    rows = conn.execute(query, params).fetchall()
+
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+
+    items = [dict(row) for row in rows]
+    next_after = None
+    if items:
+        last = items[-1]
+        next_after = {"timestamp": last["timestamp"], "id": last["id"]}
+
+    return items, next_after, has_more
+
+
+def _sanitize_name(name):
+    return re.sub(r"[^\w &-]+", "", name).strip()
+
+
+def _date_directory(ts):
+    return datetime.fromtimestamp(ts).strftime("%Y/%Y-%m/%Y-%m-%d").strip()
+
+
+def _move_path(path, directory, dry_run=False):
+    orig_filename = os.path.basename(path)
+    base, ext = os.path.splitext(orig_filename)
+    dest_filename = orig_filename
+    counter = None
+
+    while os.path.exists(os.path.join(directory, dest_filename)):
+        counter = 0 if counter is None else counter + 1
+        dest_filename = f"{base}-{counter:04d}{ext}"
+
+    dest = os.path.join(directory, dest_filename)
+    logging.getLogger("mediasort.data.move").info(f"{path} > {dest}")
+
+    if dry_run:
+        return
+
+    shutil.move(path, dest)
+
+
+def move_items(action, item_ids, name=None, dry_run=False):
+    logger = logging.getLogger("mediasort.data.move_items")
+
+    items_by_id = get_items_by_ids(item_ids)
+    if not items_by_id:
+        raise ValueError("No items found")
+
+    timestamps = [items_by_id[item_id]["timestamp"] for item_id in item_ids]
+    start_ts = min(timestamps)
+
+    if "save" in action:
+        if not name:
+            raise ValueError("You must provide a name to save")
+        name = _sanitize_name(name)
+        if not name:
+            raise ValueError("You must provide a name to save")
+
+    if action == "save_date":
+        directory = os.path.join(
+            current_app.config.get("OUTPUT_DIR"),
+            f"{_date_directory(start_ts)} {name}",
+        )
+    elif action == "save_no_date":
+        directory = os.path.join(current_app.config.get("OUTPUT_DIR"), name)
+    elif action == "delete":
+        directory = current_app.config.get("DELETE_DIR")
     else:
-        set = MediaSetStore()
+        raise ValueError("Unknown action")
 
-    start = 0
-    end = limit - 1
-
-    if from_end:
-        start = 0 - limit
-        end = -1
-
-    for item_id in redis_client.zrange(f"mediasort:set-items-{set_id}", start, end):
-        try:
-            item = get_item(item_id)
-
-            # By default, it'll regenerate an id. We don't want that
-            item.id = item_id
-        except Exception:
-            logger.warn("Skipping item in set")
-            continue
-
-        set.add_item(item)
-
-    # Each time you add an item, you set the length. So we need to do it at the end.
-    # This will also set the set id
-    # If you don't want to do this (for performance), set no_meta to true
-    if no_meta is False:
-        set = set_from_meta(set_id, set)
-
-    return set
-
-
-def top_tail_set(set_id, limit):
-    """Gets the start and end items of the set, in a "top and tail" style. Ish."""
-
-    # Since we are doing it twice, we will only do half each time
-    # TODO: account for odd values of limit
-    num_items = int(limit / 2)
-
-    # Using no_meta since we'll do it ourselves later
-    top = get_set(set_id, num_items, store=True, no_meta=True)
-    tail = get_set(set_id, num_items, from_end=True, store=True, no_meta=True)
-
-    # Put everything from tail into top (assuming not already there)
-    for x in tail.get_items():
-        if not top.check_item_exists(x):
-            top.add_item(x)
-
-    # Set the length, start, end, etc, from the meta data stored in Redis
-    top = set_from_meta(set_id, top)
-    return top
-
-
-def get_empty_set(set_id, limit=-1, from_end=False, store=False):
-    """Gets a single set by id, with no files, but with the right boundary and length"""
-
-    set = set_from_meta(set_id)
-
-    return set
-
-
-def set_from_meta(set_id, s=MediaSet()):
-    """Sets important items about the set from the metadata stored in Redis"""
-
-    logger = logging.getLogger("mediasort.system.set_from_meta")
-
-    redis_client = system.get_db()
-    meta = redis_client.hgetall(f"mediasort:set-meta-{set_id}")
-
-    logger.debug(f"Updating set with metadata: {meta}")
-
-    s.start = datetime.fromtimestamp(int(meta["start"]))
-    s.end = datetime.fromtimestamp(int(meta["end"]))
-    s.length = int(meta["length"])
-    s.id = meta["id"]
-    return s
-
-
-@Timer(name="get_top_tail_sets", text="{name}: {:.4f} seconds")
-def get_top_tail_sets(start=0, num_sets=5, max_items=10, reverse=False):
-    """
-    Gets some sets that contain some items in a "top and tail" fashion
-    start -- the start point. 
-    num_sets -- how many sets to get at a time
-    max_items -- how many items in each set should there be
-    reverse -- do things backwards (ie, z-a)
-    """
-    redis_client = system.get_db()
-
-    sets = []
-    
-    end = 10**100 # -1 doesn't seem to work. This workaround is nasty. TODO.
-    
-    # Otherwise the first one is the same
-    if start > 0:
-        offset = 1
+    if not dry_run:
+        os.makedirs(directory, exist_ok=True)
     else:
-        offset = 0
+        logger.info(
+            "Moving files in dry_run mode! No changes will occur to the file system."
+        )
 
-    for set_id in redis_client.zrange(
-        #"mediasort:sets", start=skip, end=num_sets + skip - 1, desc=reverse, withscores=True
-        "mediasort:sets", start, end, offset=offset, num=num_sets, desc=reverse, byscore=True#, withscores=True
-    ):
-        
-        # sets.append(get_set(set_id, max_items, store=True))
-        sets.append(top_tail_set(set_id, max_items))
+    for item_id in item_ids:
+        path = items_by_id[item_id]["path"]
+        _move_path(path, directory, dry_run)
 
-    return sets
+    delete_items(item_ids)
 
-
-@Timer(name="remove_item_from_set", text="{name}: {:.4f} seconds")
-def remove_item_from_set(item_id, set_id):
-    """Removes a specific item from a set. Returns the new set"""
-    logger = logging.getLogger("mediasort.data.remove_item_from_set")
-    logger.debug(f"Looking for item id: {item_id} in set id: {set_id}")
-
-    set = get_set(set_id, store=True)
-    if set is None:
-        raise Exception(f"Could not find set id: {set_id}")
-
-    item = None
-
-    # Finding the item in the set
-    item = set.get_item_by_id(item_id)
-
-    if item is None:
-        raise Exception(f"Could not find item id: {item_id} in set id: {set_id}")
-
-    set.remove_item(item)  # Remove the item from the set
-    remove_item(item, set)  # Remove the old item information from Redis
-    save_set(
-        set
-    )  # Resaves the set, since the start, length and other information may change
-
-    new_set = MediaSetStore(item)  # Creates a new MediaSet with the item
-    save_set(new_set)  # Saves the new set
-    save_item(item, new_set)  # Re-add the item, but this time with the new set info
-
-    return new_set
+    return directory

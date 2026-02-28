@@ -41,4 +41,9 @@ def create_app(config_map=None):
     app.register_blueprint(api.bp)
     app.register_blueprint(ui.bp)
 
+    from . import db
+    with app.app_context():
+        db.init_db()
+    app.teardown_appcontext(db.close_db)
+
     return app

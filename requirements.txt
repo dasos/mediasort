@@ -6,12 +6,10 @@ Pillow==12.1.1
 ffmpeg-python
 static_ffmpeg
 gunicorn
-flask-redis
 flask-executor
 requests
 codetiming
 pytest
-fakeredis>=2.9.0
 pytest-cov
 flake8
 black

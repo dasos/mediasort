@@ -1,32 +1,11 @@
 import logging
 from flask import current_app, g
-from flask_redis import FlaskRedis
 import requests
 from PIL import UnidentifiedImageError, Image, ImageOps
 from io import BytesIO
 import static_ffmpeg
 import ffmpeg
-
-def get_db():
-
-    if "redis_client" in g:
-        return g.redis_client
-
-    logger = logging.getLogger("mediasort.system.get_db")
-
-    if current_app.testing or current_app.config.get("FAKE_REDIS") is True:
-        logger.info("Using fake redis. Each request will be as new!")
-        import fakeredis
-
-        # g.redis_client = fakeredis.FakeRedis()
-        g.redis_client = FlaskRedis.from_custom_provider(
-            fakeredis.FakeRedis, current_app, decode_responses=True
-        )
-    else:
-        # For most Redis requests. It uses the REDIS_URL config property automatically
-        g.redis_client = FlaskRedis(current_app, decode_responses=True)
-
-    return g.redis_client
+from web_app import db
 
 
 def make_thumbnail(filename, wh=300):
@@ -102,26 +81,32 @@ def get_location(coords):
     if not coords:
         return ""
 
-    redis_client = get_db()
-
     rounded_coords = round(float(coords[0]), 4), round(float(coords[1]), 4)
-    rounded_coords_key = f"mediasort:coord-{rounded_coords[0]}-{rounded_coords[1]}"
+    conn = db.get_db()
 
-    if redis_client.exists(rounded_coords_key):
-        result = redis_client.get(rounded_coords_key)
+    cached = conn.execute(
+        "SELECT location FROM location_cache WHERE lat = ? AND lon = ?",
+        (rounded_coords[0], rounded_coords[1]),
+    ).fetchone()
+    if cached is not None:
+        result = cached["location"]
         logging.getLogger("mediasort.system.get_location").info(
             f"Pulled {result} from db location cache"
         )
-        return redis_client.get(rounded_coords_key)
+        return result
 
     result = request_location(rounded_coords)
 
     if result != "":
-      logging.getLogger("mediasort.system.get_location").info(
-          f"Storing {result} in db location cache under {rounded_coords_key}"
-      )
-      redis_client.set(rounded_coords_key, result)
-    
+        logging.getLogger("mediasort.system.get_location").info(
+            f"Storing {result} in db location cache under {rounded_coords}"
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
+            (rounded_coords[0], rounded_coords[1], result),
+        )
+        conn.commit()
+
     return result
 
 

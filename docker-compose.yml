@@ -2,30 +2,18 @@ version: '3.2'
 
 services:
 
-  redis:
-    image: redis
-    expose:
-     - 6379
-    networks:
-     - mediasort
-
   app:
     image: dasos/mediasort
     ports:
      - 8000:8080
-    networks:
-     - mediasort
     #volumes:
      #- /input:/input
      #- /output:/output
      #- /delete:/delete
+     #- /config:/config
     environment:
-     - 'FLASK_REDIS_URL=redis://redis:6379/0'
+     - 'FLASK_DB_PATH=/config/mediasort.db'
      #- 'FLASK_DRY_RUN=TRUE'
      # Uncomment the file above to actually make changes to your files
      #- 'FLUSH=TRUE'
      # Uncomment the file above make the refreshing of the DB much faster. Don't do it if you share the DB with anything.
-
-
-networks:
- mediasort:

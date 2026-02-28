@@ -17,6 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . ./
 
 COPY images /input
+RUN mkdir -p /config
+VOLUME ["/config"]
 
 ENV PYTHONUNBUFFERED=1
 

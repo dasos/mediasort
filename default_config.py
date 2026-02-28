@@ -1,8 +1,11 @@
 INPUT_DIR = "/input"
 OUTPUT_DIR = "/output"
 DELETE_DIR = "/delete"
+DB_PATH = "/config/mediasort.db"
+SET_GAP_HOURS = 2
 SETS_SHOWN = 3
 SUMMARY_ITEMS = 6
+ITEMS_PER_PAGE = 20
 THUMBNAIL_SIZE = 300
 # The width of the thumbnail
 THUMBNAIL_VIDEO_LENGTH = 5
