@@ -229,7 +229,7 @@ function renderItem(item, setId, allowRemove) {
   return `
     <div class="item col-lg-4 col-md-6 col-12 mb-4" data-item_id="${item.id}" data-set_id="${setId}">
       <div class="card h-100">
-        <a href="thumbnail/detail/${item.id}" target="_blank"><img src="thumbnail/${item.id}" loading="lazy" class="card-img-top" /></a>
+        <a href="/thumbnail/detail/${item.id}" target="_blank"><img src="/thumbnail/${item.id}" loading="lazy" class="card-img-top" /></a>
         <div class="alert alert-warning text-center d-none" role="alert">No thumbnail available</div>
         <div class="card-body">
           <div class="striped">
