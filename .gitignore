@@ -7,3 +7,6 @@ more/
 htmlcov
 .DS_Store
 venv
+.envrc
+.direnv/
+mediasort.db
