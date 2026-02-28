@@ -1,5 +1,10 @@
 import pytest
-from web_app import create_app, data
+from web_app import create_app, data, system
+
+
+@pytest.fixture(autouse=True)
+def stub_request_location(monkeypatch):
+    monkeypatch.setattr(system, "request_location", lambda coords: "")
 
 
 @pytest.fixture

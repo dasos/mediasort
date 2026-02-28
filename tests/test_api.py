@@ -76,6 +76,21 @@ def test_items_api(client_data):
     assert status["next_after"] is not None
 
 
+def test_items_api_pagination(client_data):
+    first = client_data.get("/api/items?limit=3")
+    first_payload = json.loads(first.data)
+
+    after = first_payload["next_after"]
+    response = client_data.get(
+        f"/api/items?limit=3&after_ts={after['timestamp']}&after_id={after['id']}"
+    )
+    payload = json.loads(response.data)
+
+    assert response.status_code == 200
+    assert len(payload["items"]) == 3
+    assert payload["items"][0]["id"] != first_payload["items"][-1]["id"]
+
+
 def test_move_set(client_tuple_data, app):
 
     client, items = client_tuple_data
@@ -108,3 +123,9 @@ def test_move_set(client_tuple_data, app):
     assert remaining == test_data.LENGTH_OF_MEDIAITEMS - (
         len(set_one) + len(set_two) + len(set_three)
     )
+
+
+def test_move_set_invalid_item_ids(client_data):
+    response = client_data.post("/api/set/save_date", json={"item_ids": ["nope"]})
+
+    assert response.status_code == 400
