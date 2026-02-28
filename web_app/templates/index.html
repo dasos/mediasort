@@ -423,7 +423,7 @@ $('#sets-container,#confirmDelete').on('click', '.action-button', function(e) {
     contentType: 'application/json',
     data: JSON.stringify({
       name: name,
-      item_ids: set.items.map(item => item.id)
+      item_ids: set.items.map(item => String(item.id))
     })
   }).done(function(result) {
     if (name) {
@@ -475,15 +475,15 @@ $('#sets-container').on('click', '.remove-from-set', function(e) {
   var itemElement = $(this).closest('.item');
   var setElement = $(this).closest('.set');
   var setId = setElement.data('set_id');
-  var itemId = itemElement.data('item_id');
+  var itemId = String(itemElement.data('item_id'));
 
   var set = state.setsById[setId];
   if (!set) return;
 
-  const removedItems = set.items.filter(item => item.id === itemId);
+  const removedItems = set.items.filter(item => String(item.id) === itemId);
   if (removedItems.length === 0) return;
 
-  set.items = set.items.filter(item => item.id !== itemId);
+  set.items = set.items.filter(item => String(item.id) !== itemId);
   if (set.items.length > 0) {
     set.startTs = set.items[0].timestamp;
     set.endTs = set.items[set.items.length - 1].timestamp;

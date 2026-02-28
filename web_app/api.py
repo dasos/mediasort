@@ -57,9 +57,21 @@ def get_items():
         order=order,
     )
 
+    serialized_items = []
+    for item in items:
+        item = dict(item)
+        item["id"] = str(item["id"])
+        serialized_items.append(item)
+
+    if next_after is not None:
+        next_after = {
+            "timestamp": next_after["timestamp"],
+            "id": str(next_after["id"]),
+        }
+
     return jsonify(
         {
-            "items": items,
+            "items": serialized_items,
             "next_after": next_after,
             "has_more": has_more,
         }
