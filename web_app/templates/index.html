@@ -68,7 +68,8 @@ const state = {
   currentSet: null,
   completedSets: [],
   renderedCount: 0,
-  setsById: {}
+  setsById: {},
+  blockedSetIdsByItemId: {}
 };
 
 const gapSeconds = config.gapHours * 60 * 60;
@@ -146,6 +147,93 @@ function finalizeCurrentSet() {
   state.completedSets.push(state.currentSet);
   state.setsById[state.currentSet.uiId] = state.currentSet;
   state.currentSet = null;
+}
+
+function sortCompletedSets() {
+  state.completedSets.sort((a, b) => {
+    if (a.startTs !== b.startTs) return a.startTs - b.startTs;
+    if (a.endTs !== b.endTs) return a.endTs - b.endTs;
+    return String(a.uiId).localeCompare(String(b.uiId));
+  });
+}
+
+function addBlockedSetForItem(itemId, setId) {
+  const key = String(itemId);
+  const blocked = state.blockedSetIdsByItemId[key] || [];
+  if (!blocked.includes(setId)) {
+    blocked.push(setId);
+  }
+  state.blockedSetIdsByItemId[key] = blocked;
+}
+
+function isSetBlockedForItem(itemId, setId) {
+  const key = String(itemId);
+  const blocked = state.blockedSetIdsByItemId[key] || [];
+  return blocked.includes(setId);
+}
+
+function getInsertIndexByTime(items, timestamp, itemId) {
+  let idx = items.findIndex(existing => existing.timestamp > timestamp);
+  if (idx === -1) idx = items.length;
+
+  while (
+    idx < items.length &&
+    items[idx].timestamp === timestamp &&
+    String(items[idx].id) < String(itemId)
+  ) {
+    idx += 1;
+  }
+
+  return idx;
+}
+
+function canInsertItemIntoSet(item, set) {
+  if (!set || !set.items || set.items.length === 0) return false;
+  if (isSetBlockedForItem(item.id, set.uiId)) return false;
+  if (set.items.some(existing => String(existing.id) === String(item.id))) return false;
+
+  const insertIdx = getInsertIndexByTime(set.items, item.timestamp, item.id);
+  const prev = insertIdx > 0 ? set.items[insertIdx - 1] : null;
+  const next = insertIdx < set.items.length ? set.items[insertIdx] : null;
+
+  if (prev && item.timestamp - prev.timestamp > gapSeconds) return false;
+  if (next && next.timestamp - item.timestamp > gapSeconds) return false;
+
+  return true;
+}
+
+function setDistanceFromItem(item, set) {
+  if (item.timestamp < set.startTs) return set.startTs - item.timestamp;
+  if (item.timestamp > set.endTs) return item.timestamp - set.endTs;
+  return 0;
+}
+
+function findBestTargetSet(item) {
+  let best = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of state.completedSets) {
+    if (!canInsertItemIntoSet(item, candidate)) continue;
+
+    const distance = setDistanceFromItem(item, candidate);
+    if (
+      best === null ||
+      distance < bestDistance ||
+      (distance === bestDistance && candidate.startTs < best.startTs)
+    ) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+
+  return best;
+}
+
+function insertItemIntoSet(item, set) {
+  const insertIdx = getInsertIndexByTime(set.items, item.timestamp, item.id);
+  set.items.splice(insertIdx, 0, item);
+  set.startTs = set.items[0].timestamp;
+  set.endTs = set.items[set.items.length - 1].timestamp;
 }
 
 async function fetchItems() {
@@ -257,17 +345,20 @@ function renderSet(set) {
   const totalItems = set.items.length;
   const showSummary = !set.expanded && totalItems > config.summaryItems;
 
-  let items = set.items;
+  let firstItems = set.items;
+  let lastItems = [];
   let showLoadAll = false;
   if (showSummary) {
-    const half = Math.floor(config.summaryItems / 2);
-    items = set.items.slice(0, half).concat(set.items.slice(-half));
+    const firstHalfCount = Math.floor(config.summaryItems / 2);
+    const lastHalfCount = config.summaryItems - firstHalfCount;
+    firstItems = set.items.slice(0, firstHalfCount);
+    lastItems = set.items.slice(-lastHalfCount);
     showLoadAll = true;
   }
 
   const allowRemove = totalItems > 1;
-  const itemsHtml = items.map(item => renderItem(item, set.uiId, allowRemove)).join("\n");
-  const midPoint = Math.floor(items.length / 2);
+  const firstItemsHtml = firstItems.map(item => renderItem(item, set.uiId, allowRemove)).join("\n");
+  const lastItemsHtml = lastItems.map(item => renderItem(item, set.uiId, allowRemove)).join("\n");
 
   let loadAllHtml = "";
   if (showLoadAll) {
@@ -289,8 +380,9 @@ function renderSet(set) {
         </div>
       </div>
       <div class="container row">
-        ${itemsHtml}
+        ${firstItemsHtml}
         ${loadAllHtml}
+        ${lastItemsHtml}
       </div>
       <div class="container">
         <form class="form-inline">
@@ -360,6 +452,21 @@ function renderNextBatch() {
   updateStats();
 }
 
+function rerenderSets(targetCount) {
+  const renderLimit = Math.min(targetCount, state.completedSets.length);
+  $('#sets-container').empty();
+  state.renderedCount = 0;
+
+  for (let i = 0; i < renderLimit; i++) {
+    $('#sets-container').append(renderSet(state.completedSets[i]));
+    state.renderedCount += 1;
+  }
+
+  setEvents();
+  decideEmptyState();
+  updateStats();
+}
+
 async function loadMoreSets() {
   if (state.loadingItems) return;
   await ensureSetsAvailable(state.renderedCount + config.setsPerBatch);
@@ -374,6 +481,7 @@ function reloadAll() {
   state.completedSets = [];
   state.renderedCount = 0;
   state.setsById = {};
+  state.blockedSetIdsByItemId = {};
   $('#sets-container').empty();
   updateStats();
   loadMoreSets();
@@ -473,15 +581,17 @@ $('#sets-container').on('click', '.remove-from-set', function(e) {
   e.preventDefault();
 
   var itemElement = $(this).closest('.item');
-  var setElement = $(this).closest('.set');
-  var setId = setElement.data('set_id');
+  var setId = $(this).closest('.set').data('set_id');
   var itemId = String(itemElement.data('item_id'));
 
   var set = state.setsById[setId];
   if (!set) return;
 
-  const removedItems = set.items.filter(item => String(item.id) === itemId);
-  if (removedItems.length === 0) return;
+  const removedItem = set.items.find(item => String(item.id) === itemId);
+  if (!removedItem) return;
+
+  const previouslyRendered = state.renderedCount;
+  addBlockedSetForItem(removedItem.id, set.uiId);
 
   set.items = set.items.filter(item => String(item.id) !== itemId);
   if (set.items.length > 0) {
@@ -492,20 +602,36 @@ $('#sets-container').on('click', '.remove-from-set', function(e) {
   itemElement.remove();
 
   if (set.items.length === 0) {
-    setElement.next("hr").remove();
-    setElement.remove();
     delete state.setsById[setId];
     state.completedSets = state.completedSets.filter(s => s.uiId !== setId);
   }
 
-  const newSet = makeSet(removedItems);
-  state.completedSets.push(newSet);
-  state.completedSets.sort((a, b) => a.startTs - b.startTs);
-  state.setsById[newSet.uiId] = newSet;
+  let createdNewSet = false;
+  const targetSet = findBestTargetSet(removedItem);
+  if (targetSet) {
+    insertItemIntoSet(removedItem, targetSet);
+  } else {
+    const newSet = makeSet([removedItem]);
+    state.completedSets.push(newSet);
+    state.setsById[newSet.uiId] = newSet;
+    createdNewSet = true;
+  }
 
-  $('#sets-container').append(renderSet(newSet));
-  setEvents();
-  updateStats();
+  sortCompletedSets();
+
+  let nextRendered = previouslyRendered;
+  if (set.items.length === 0) {
+    nextRendered = Math.max(0, nextRendered - 1);
+  }
+  if (createdNewSet) {
+    nextRendered = Math.min(state.completedSets.length, nextRendered + 1);
+  }
+
+  rerenderSets(nextRendered);
+
+  if (set.items.length === 0 && state.hasMore) {
+    loadMoreSets();
+  }
 });
 
 var statusCheck = function() {
