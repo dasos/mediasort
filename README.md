@@ -18,7 +18,7 @@ The workflow is like this, assuming you keep the defaults:
 
 ## Get it running
 ### Docker
-The easiest way is to take the Docker Compose file, modify some of the config, and then execute it. It will start a single container running the app. SQLite is stored at `/config/mediasort.db` by default.
+The easiest way is to take the Docker Compose file, modify some of the config, and then execute it. It will start a single container running the app. SQLite defaults to `mediasort.db` unless `FLASK_DB_PATH` is set (the sample compose file sets it to `/config/mediasort.db`).
 
     docker-compose -f docker-compose.yml up
 
@@ -46,9 +46,9 @@ Install the dependancies (exiftool may need some help):
     pip3 install -r requirements.txt
 	sudo apt install exiftool
 
-Set the variables:
+Set the variables (note that `FLASK_DB_PATH` is optional and defaults to `mediasort.db`):
 
-    export FLASK_DB_PATH="/config/mediasort.db"
+    # export FLASK_DB_PATH="/config/mediasort.db"
     export FLASK_GEOAPIFY_API_KEY="<your_key>"
     export FLASK_DEBUG=true
 

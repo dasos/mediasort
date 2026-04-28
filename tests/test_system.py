@@ -27,3 +27,29 @@ def test_location_nothing(monkeypatch, app):
         location = system.get_location((50, 0))  # In the English Channel
 
     assert location == ""
+
+
+def test_request_location_uses_address_and_city(monkeypatch, app):
+    class FakeResponse:
+        status_code = 200
+        text = (
+            '{"results":[{"address_line1":"1600 Amphitheatre Pkwy","city":"Mountain View"}]}'
+        )
+
+        def json(self):
+            return {
+                "results": [
+                    {
+                        "address_line1": "1600 Amphitheatre Pkwy",
+                        "city": "Mountain View",
+                    }
+                ]
+            }
+
+    monkeypatch.setattr(system.requests, "get", lambda *_args, **_kwargs: FakeResponse())
+
+    with app.app_context():
+        app.config["GEOAPIFY_API_KEY"] = "test-api-key"
+        location = system.request_location((37.422, -122.084))
+
+    assert location == "1600 Amphitheatre Pkwy, Mountain View"

@@ -1,7 +1,7 @@
 INPUT_DIR = "/input"
 OUTPUT_DIR = "/output"
 DELETE_DIR = "/delete"
-DB_PATH = "/config/mediasort.db"
+DB_PATH = "mediasort.db"
 GEOAPIFY_API_KEY = ""
 SET_GAP_HOURS = 2
 SETS_SHOWN = 3

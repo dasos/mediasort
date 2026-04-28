@@ -150,7 +150,11 @@ def request_location(coords):
     l.debug(f"Looked up: {payload}. Complete result: {r.text}")
 
     if "address_line1" in result and result["address_line1"]:
-        return result["address_line1"]
+        address_line1 = result["address_line1"].strip()
+        city = result.get("city", "").strip()
+        if city:
+            return f"{address_line1}, {city}"
+        return address_line1
 
     if "formatted" in result and result["formatted"]:
         return result["formatted"]
