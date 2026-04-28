@@ -1,7 +1,7 @@
-
 # mediasort
+![Static Badge](https://img.shields.io/badge/Coded_with-Codex-blue) ![Static Badge](https://img.shields.io/badge/Coded_with-Claude-orange)
 
-MediaSort is a Python3 web UI that helps you sort media items into folders. The classic use case is to take the many photos and videos produced by a smartphone, and makes sense of them. It also works well for a DSLR.
+MediaSort is a Python3 web UI that helps you sort media items into folders. The classic use case is to take the many photos and videos produced by a smartphone, and makes sense of them. It also works well for a DSLR. The initial version was human coded. More recent updates have been done with the help of OpenAI Codex and Claude Code. 
 
 ## What does it do?
 <img src="screenshot.png" width="600"/>
