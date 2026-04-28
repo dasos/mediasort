@@ -72,6 +72,22 @@ def test_get_items_order(app):
     assert timestamps == sorted(timestamps)
 
 
+def test_scan_new_files_on_empty_db(app):
+    with app.app_context():
+        added = data.scan_new_files()
+        assert added > 0
+        assert data.get_item_count() == added
+
+
+def test_scan_new_files_no_duplicates(app):
+    with app.app_context():
+        data.populate_db()
+        count_after_populate = data.get_item_count()
+        added = data.scan_new_files()
+        assert added == 0
+        assert data.get_item_count() == count_after_populate
+
+
 def test_location_populated_on_scan(app, monkeypatch):
     monkeypatch.setattr(
         "web_app.system.request_location", lambda coords: "Address Line 1"

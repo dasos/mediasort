@@ -170,6 +170,43 @@ def populate_db(force=False):
     return
 
 
+def scan_new_files():
+    logger = logging.getLogger("mediasort.system.scan_new_files")
+    input_dir = current_app.config.get("INPUT_DIR")
+    db_path = current_app.config.get("DB_PATH")
+    conn = db.connect_db(db_path)
+
+    existing = {row["path"] for row in conn.execute("SELECT path FROM items")}
+
+    added = 0
+    conn.execute("BEGIN")
+    for path in MediaFiles.get_media(input_dir):
+        if path in existing:
+            continue
+        logger.debug(f"New file: {path}")
+        try:
+            item = MediaItem(path)
+        except Exception:
+            logger.warning(f"Unable to add file: {path}")
+            continue
+        row = _item_to_row(item, conn)
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO items
+                (id, path, timestamp, orig_filename, orig_directory, coords_lat, coords_lon, location)
+            VALUES
+                (:id, :path, :timestamp, :orig_filename, :orig_directory, :coords_lat, :coords_lon, :location)
+            """,
+            row,
+        )
+        added += 1
+
+    conn.commit()
+    logger.info(f"Scan complete: {added} new file(s) added")
+    conn.close()
+    return added
+
+
 def get_item_count():
     conn = db.get_db()
     row = conn.execute("SELECT COUNT(*) AS count FROM items").fetchone()

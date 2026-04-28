@@ -1,4 +1,7 @@
 import logging
+import threading
+import time
+
 from flask import Flask
 
 
@@ -46,4 +49,27 @@ def create_app(config_map=None):
         db.init_db()
     app.teardown_appcontext(db.close_db)
 
+    if not app.testing:
+        _start_background_scanner(app)
+
     return app
+
+
+def _start_background_scanner(app):
+    interval_hours = app.config.get("SCAN_INTERVAL_HOURS")
+    if not interval_hours:
+        return
+
+    interval_seconds = int(interval_hours * 3600)
+    logger = logging.getLogger("mediasort")
+    logger.info(f"Background scanner starting, interval={interval_hours}h")
+
+    def loop():
+        while True:
+            time.sleep(interval_seconds)
+            logger.info("Background scanner: checking for new files")
+            with app.app_context():
+                from web_app import data
+                data.scan_new_files()
+
+    threading.Thread(target=loop, daemon=True, name="mediasort-scanner").start()

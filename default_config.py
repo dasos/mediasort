@@ -25,3 +25,5 @@ KEEP_LOCATIONS = True
 # If true, saves the locations. Otherwise they go when the refresh happens
 FLUSH = False
 # If true, flush (empty) the database. Otherwise it selects all the keys prefixed with 'mediasort:' and deletes them individually. You probably want to do this if you start seeing timeouts when the refresh is happening, but really don't do it if you share the DB with anything
+SCAN_INTERVAL_HOURS = 2
+# How often (in hours) to automatically scan for new files. Set to 0 to disable.
