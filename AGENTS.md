@@ -17,20 +17,16 @@ Important modules:
 - `MediaItem.py`, `MediaFiles.py`, `MediaSet.py`: core media parsing and grouping/domain behavior.
 - `tests/`: pytest suite with Flask fixtures in `tests/conftest.py`.
 
-## Local State
+## Environment
 
-The worktree may already contain user changes. Before editing, check `git status --short` and avoid reverting unrelated changes.
+The project uses direnv with `layout python3`. On first use, allow direnv and install dependencies:
 
-At initialization time, the following files were already modified:
+```bash
+direnv allow
+pip install -r requirements.txt
+```
 
-- `README.md`
-- `default_config.py`
-- `default_config_dev.py`
-- `requirements.txt`
-- `tests/test_system.py`
-- `web_app/system.py`
-
-Treat those as user-owned unless the current task specifically asks to modify them.
+Environment variables (including `FLASK_DEBUG`, `FLASK_DB_PATH`, and `FLASK_GEOAPIFY_API_KEY`) are set via `.envrc`.
 
 ## Running The App
 

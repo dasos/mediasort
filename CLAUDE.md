@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MediaSort is a Flask web app for sorting smartphone/DSLR photos and videos into folders. It scans an input directory, extracts EXIF metadata, stores rows in SQLite, groups items client-side by time gap, and lets users name/split/delete sets before moving them to output directories.
 
+## Environment
+
+The project uses direnv with `layout python3`. On first use:
+
+```bash
+direnv allow
+pip install -r requirements.txt
+```
+
+Environment variables (`FLASK_DEBUG`, `FLASK_DB_PATH`, `FLASK_GEOAPIFY_API_KEY`) are set via `.envrc`.
+
 ## Commands
 
 ```bash
