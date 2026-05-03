@@ -1,13 +1,35 @@
 import sqlite3
+import threading
+from contextlib import contextmanager
+
 from flask import current_app, g
+
+BUSY_TIMEOUT_MS = 30000
+
+_write_lock = threading.RLock()
 
 
 def connect_db(path):
     conn = sqlite3.connect(
-        path, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=False
+        path,
+        detect_types=sqlite3.PARSE_DECLTYPES,
+        check_same_thread=False,
+        timeout=BUSY_TIMEOUT_MS / 1000,
     )
     conn.row_factory = sqlite3.Row
+    conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+    except sqlite3.OperationalError:
+        pass
     return conn
+
+
+@contextmanager
+def write_lock():
+    with _write_lock:
+        yield
 
 
 def get_db():
@@ -30,8 +52,7 @@ def close_db(_=None):
 
 def init_db():
     db = get_db()
-    db.executescript(
-        """
+    db.executescript("""
         CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY,
             path TEXT NOT NULL UNIQUE,
@@ -60,6 +81,5 @@ def init_db():
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
-        """
-    )
+        """)
     db.commit()

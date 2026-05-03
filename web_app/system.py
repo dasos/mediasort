@@ -101,11 +101,12 @@ def get_location(coords):
         logging.getLogger("mediasort.system.get_location").info(
             f"Storing {result} in db location cache under {rounded_coords}"
         )
-        conn.execute(
-            "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
-            (rounded_coords[0], rounded_coords[1], result),
-        )
-        conn.commit()
+        with db.write_lock():
+            conn.execute(
+                "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
+                (rounded_coords[0], rounded_coords[1], result),
+            )
+            conn.commit()
 
     return result
 

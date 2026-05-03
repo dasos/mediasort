@@ -20,11 +20,12 @@ STATUS_KEY = "status"
 def _set_status(value, conn=None):
     if conn is None:
         conn = db.get_db()
-    conn.execute(
-        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
-        (STATUS_KEY, value),
-    )
-    conn.commit()
+    with db.write_lock():
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+            (STATUS_KEY, value),
+        )
+        conn.commit()
 
 
 def get_status():
@@ -44,45 +45,46 @@ def clear_db():
 
     conn = db.get_db()
 
-    suggestions = []
-    locations = []
-    if current_app.config.get("KEEP_SUGGESTIONS"):
-        suggestions = [
-            row["name"] for row in conn.execute("SELECT name FROM suggestions")
-        ]
-    if current_app.config.get("KEEP_LOCATIONS"):
-        locations = [
-            (row["lat"], row["lon"], row["location"])
-            for row in conn.execute("SELECT lat, lon, location FROM location_cache")
-        ]
+    with db.write_lock():
+        suggestions = []
+        locations = []
+        if current_app.config.get("KEEP_SUGGESTIONS"):
+            suggestions = [
+                row["name"] for row in conn.execute("SELECT name FROM suggestions")
+            ]
+        if current_app.config.get("KEEP_LOCATIONS"):
+            locations = [
+                (row["lat"], row["lon"], row["location"])
+                for row in conn.execute("SELECT lat, lon, location FROM location_cache")
+            ]
 
-    if current_app.config.get("FLUSH"):
-        logger.warning("Flushing DB")
-        conn.execute("DELETE FROM items")
-        conn.execute("DELETE FROM suggestions")
-        conn.execute("DELETE FROM location_cache")
-        conn.execute("DELETE FROM meta")
-    else:
-        logger.warning("Deleting from DB")
-        conn.execute("DELETE FROM items")
-        conn.execute("DELETE FROM meta")
-        if not current_app.config.get("KEEP_SUGGESTIONS"):
+        if current_app.config.get("FLUSH"):
+            logger.warning("Flushing DB")
+            conn.execute("DELETE FROM items")
             conn.execute("DELETE FROM suggestions")
-        if not current_app.config.get("KEEP_LOCATIONS"):
             conn.execute("DELETE FROM location_cache")
+            conn.execute("DELETE FROM meta")
+        else:
+            logger.warning("Deleting from DB")
+            conn.execute("DELETE FROM items")
+            conn.execute("DELETE FROM meta")
+            if not current_app.config.get("KEEP_SUGGESTIONS"):
+                conn.execute("DELETE FROM suggestions")
+            if not current_app.config.get("KEEP_LOCATIONS"):
+                conn.execute("DELETE FROM location_cache")
 
-    if current_app.config.get("KEEP_SUGGESTIONS"):
-        conn.executemany(
-            "INSERT OR IGNORE INTO suggestions (name) VALUES (?)",
-            [(name,) for name in suggestions],
-        )
-    if current_app.config.get("KEEP_LOCATIONS"):
-        conn.executemany(
-            "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
-            locations,
-        )
+        if current_app.config.get("KEEP_SUGGESTIONS"):
+            conn.executemany(
+                "INSERT OR IGNORE INTO suggestions (name) VALUES (?)",
+                [(name,) for name in suggestions],
+            )
+        if current_app.config.get("KEEP_LOCATIONS"):
+            conn.executemany(
+                "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
+                locations,
+            )
 
-    conn.commit()
+        conn.commit()
 
 
 def _lookup_location(conn, coords):
@@ -97,10 +99,12 @@ def _lookup_location(conn, coords):
 
     result = system.request_location(rounded_coords)
     if result:
-        conn.execute(
-            "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
-            (rounded_coords[0], rounded_coords[1], result),
-        )
+        with db.write_lock():
+            conn.execute(
+                "INSERT OR REPLACE INTO location_cache (lat, lon, location) VALUES (?, ?, ?)",
+                (rounded_coords[0], rounded_coords[1], result),
+            )
+            conn.commit()
     return result
 
 
@@ -130,33 +134,36 @@ def populate_db(force=False):
     def load_data(input_dir):
         db_path = current_app.config.get("DB_PATH")
         conn = db.connect_db(db_path)
+        try:
+            _set_status("loading", conn)
 
-        _set_status("loading", conn)
+            for path in MediaFiles.get_media(input_dir):
+                logger.debug(f"Loading path: {path}")
+                try:
+                    item = MediaItem(path)
+                except Exception:
+                    logger.warning(f"Unable to add file: {path}")
+                    continue
 
-        conn.execute("BEGIN")
+                row = _item_to_row(item, conn)
+                with db.write_lock():
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO items
+                            (id, path, timestamp, orig_filename, orig_directory, coords_lat, coords_lon, location)
+                        VALUES
+                            (:id, :path, :timestamp, :orig_filename, :orig_directory, :coords_lat, :coords_lon, :location)
+                        """,
+                        row,
+                    )
+                    conn.commit()
 
-        for path in MediaFiles.get_media(input_dir):
-            logger.debug(f"Loading path: {path}")
-            try:
-                item = MediaItem(path)
-            except Exception:
-                logger.warning(f"Unable to add file: {path}")
-                continue
-
-            row = _item_to_row(item, conn)
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO items
-                    (id, path, timestamp, orig_filename, orig_directory, coords_lat, coords_lon, location)
-                VALUES
-                    (:id, :path, :timestamp, :orig_filename, :orig_directory, :coords_lat, :coords_lon, :location)
-                """,
-                row,
-            )
-
-        conn.commit()
-        _set_status("done", conn)
-        conn.close()
+            _set_status("done", conn)
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     if current_app.testing:
         load_data(current_app.config.get("INPUT_DIR"))
@@ -175,36 +182,41 @@ def scan_new_files():
     input_dir = current_app.config.get("INPUT_DIR")
     db_path = current_app.config.get("DB_PATH")
     conn = db.connect_db(db_path)
+    try:
+        existing = {row["path"] for row in conn.execute("SELECT path FROM items")}
 
-    existing = {row["path"] for row in conn.execute("SELECT path FROM items")}
+        added = 0
+        for path in MediaFiles.get_media(input_dir):
+            if path in existing:
+                continue
+            logger.debug(f"New file: {path}")
+            try:
+                item = MediaItem(path)
+            except Exception:
+                logger.warning(f"Unable to add file: {path}")
+                continue
+            row = _item_to_row(item, conn)
+            with db.write_lock():
+                cursor = conn.execute(
+                    """
+                    INSERT OR IGNORE INTO items
+                        (id, path, timestamp, orig_filename, orig_directory, coords_lat, coords_lon, location)
+                    VALUES
+                        (:id, :path, :timestamp, :orig_filename, :orig_directory, :coords_lat, :coords_lon, :location)
+                    """,
+                    row,
+                )
+                if cursor.rowcount:
+                    added += 1
+                conn.commit()
 
-    added = 0
-    conn.execute("BEGIN")
-    for path in MediaFiles.get_media(input_dir):
-        if path in existing:
-            continue
-        logger.debug(f"New file: {path}")
-        try:
-            item = MediaItem(path)
-        except Exception:
-            logger.warning(f"Unable to add file: {path}")
-            continue
-        row = _item_to_row(item, conn)
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO items
-                (id, path, timestamp, orig_filename, orig_directory, coords_lat, coords_lon, location)
-            VALUES
-                (:id, :path, :timestamp, :orig_filename, :orig_directory, :coords_lat, :coords_lon, :location)
-            """,
-            row,
-        )
-        added += 1
-
-    conn.commit()
-    logger.info(f"Scan complete: {added} new file(s) added")
-    conn.close()
-    return added
+        logger.info(f"Scan complete: {added} new file(s) added")
+        return added
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def get_item_count():
@@ -215,8 +227,9 @@ def get_item_count():
 
 def add_suggestion(name):
     conn = db.get_db()
-    conn.execute("INSERT OR IGNORE INTO suggestions (name) VALUES (?)", (name,))
-    conn.commit()
+    with db.write_lock():
+        conn.execute("INSERT OR IGNORE INTO suggestions (name) VALUES (?)", (name,))
+        conn.commit()
 
 
 def get_suggestions():
@@ -250,8 +263,9 @@ def delete_items(item_ids):
 
     conn = db.get_db()
     placeholders = ",".join(["?"] * len(item_ids))
-    conn.execute(f"DELETE FROM items WHERE id IN ({placeholders})", item_ids)
-    conn.commit()
+    with db.write_lock():
+        conn.execute(f"DELETE FROM items WHERE id IN ({placeholders})", item_ids)
+        conn.commit()
 
 
 @Timer(name="get_items", text="{name}: {:.4f} seconds")

@@ -45,6 +45,7 @@ def create_app(config_map=None):
     app.register_blueprint(ui.bp)
 
     from . import db
+
     with app.app_context():
         db.init_db()
     app.teardown_appcontext(db.close_db)
@@ -70,6 +71,10 @@ def _start_background_scanner(app):
             logger.info("Background scanner: checking for new files")
             with app.app_context():
                 from web_app import data
-                data.scan_new_files()
+
+                try:
+                    data.scan_new_files()
+                except Exception:
+                    logger.exception("Background scanner failed")
 
     threading.Thread(target=loop, daemon=True, name="mediasort-scanner").start()
