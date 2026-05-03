@@ -1,8 +1,12 @@
 import logging
+import os
 import threading
 import time
 
 from flask import Flask
+
+_scanner_start_lock = threading.Lock()
+_scanner_locks = {}
 
 
 def create_app(config_map=None):
@@ -61,8 +65,11 @@ def _start_background_scanner(app):
     if not interval_hours:
         return
 
-    interval_seconds = int(interval_hours * 3600)
     logger = logging.getLogger("mediasort")
+    if _acquire_background_scanner_lock(app, logger) is None:
+        return
+
+    interval_seconds = int(interval_hours * 3600)
     logger.info(f"Background scanner starting, interval={interval_hours}h")
 
     def loop():
@@ -77,4 +84,33 @@ def _start_background_scanner(app):
                 except Exception:
                     logger.exception("Background scanner failed")
 
-    threading.Thread(target=loop, daemon=True, name="mediasort-scanner").start()
+    thread = threading.Thread(target=loop, daemon=True, name="mediasort-scanner")
+    thread.start()
+    return thread
+
+
+def _acquire_background_scanner_lock(app, logger):
+    db_path = app.config.get("DB_PATH") or "mediasort.db"
+    lock_path = f"{os.path.abspath(db_path)}.scanner.lock"
+
+    with _scanner_start_lock:
+        if lock_path in _scanner_locks:
+            logger.info("Background scanner already running in this process")
+            return None
+
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        lock_file = open(lock_path, "a")
+        try:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock_file.close()
+            logger.info("Background scanner already running in another process")
+            return None
+        except Exception:
+            lock_file.close()
+            raise
+
+        _scanner_locks[lock_path] = lock_file
+        return lock_file
